@@ -2,17 +2,17 @@
   <img src="https://content.umami.is/website/images/umami-logo.png" alt="Umami Logo" width="100">
 </p>
 
-<h1 align="center">Umami</h1>
+<h1 align="center">Umami — Cloudflare edition</h1>
 
 <p align="center">
-  <i>Umami is a privacy-first analytics platform. Traffic, campaigns, behavior, conversions, and revenue in one place — no cookies, no surveillance, self-hosted or in the cloud.</i>
+  <i>A personally maintained Umami deployment on Cloudflare Workers and D1.</i>
 </p>
 
 <p align="center">
-  <a href="https://github.com/umami-software/umami/releases"><img src="https://img.shields.io/github/release/umami-software/umami.svg" alt="GitHub Release" /></a>
-  <a href="https://github.com/umami-software/umami/blob/master/LICENSE"><img src="https://img.shields.io/github/license/umami-software/umami.svg" alt="MIT License" /></a>
-  <a href="https://github.com/umami-software/umami/actions"><img src="https://img.shields.io/github/actions/workflow/status/umami-software/umami/ci.yml" alt="Build Status" /></a>
-  <a href="https://cloud.umami.is/share/LGazGOecbDtaIwDr/umami.is" style="text-decoration: none;"><img src="https://img.shields.io/badge/Try%20Demo%20Now-Click%20Here-brightgreen" alt="Umami Demo" /></a>
+  <a href="https://github.com/xingkaixin/umami/actions/workflows/ci.yml">CI</a> ·
+  <a href="https://github.com/xingkaixin/umami/issues">Issues</a> ·
+  <a href="LICENSE">MIT License</a> ·
+  <a href="https://github.com/umami-software/umami">Upstream Umami</a>
 </p>
 
 ---
@@ -21,6 +21,9 @@
 
 This fork runs Umami on **Cloudflare Workers + D1**, using **vinext** and **Drizzle**.
 It does not need Vercel, PostgreSQL, Prisma, Redis, or a Node.js application server.
+It is based on the supplied Umami 3.3.1 source snapshot and maintained in
+[`xingkaixin/umami`](https://github.com/xingkaixin/umami). Report problems in this
+repository, not upstream. Upstream changes must be reviewed and ported explicitly.
 The upstream Umami documentation still describes the original deployment; use the
 [Cloudflare deployment guide](docs/cloudflare.md) for this fork.
 
@@ -51,8 +54,10 @@ migration commands share `.wrangler/state`; neither touches a remote database.
 
 ### Deployment
 
-Create a D1 database, configure its ID in `wrangler.jsonc`, set Worker secrets,
-apply D1 migrations, and deploy. See [the complete procedure](docs/cloudflare.md).
+The configured production instance is [umami.xingkaixin.me](https://umami.xingkaixin.me).
+Its Worker, account, D1 ID, and Custom Domain are recorded in `wrangler.jsonc`.
+Commands using `--remote` target that production database. CI does not deploy.
+For a new instance or a production update, follow [the deployment guide](docs/cloudflare.md).
 
 ### Compatibility
 
@@ -63,26 +68,17 @@ vinext is pinned to a beta release; validate upgrades before deploying them.
 
 ---
 
-## 🛟 Support
+## Maintenance
 
-<p align="center">
-  <a href="https://github.com/umami-software/umami"><img src="https://img.shields.io/badge/GitHub--blue?style=social&logo=github" alt="GitHub" /></a>
-  <a href="https://twitter.com/umami_software"><img src="https://img.shields.io/badge/Twitter--blue?style=social&logo=twitter" alt="Twitter" /></a>
-  <a href="https://linkedin.com/company/umami-software"><img src="https://img.shields.io/badge/LinkedIn--blue?style=social&logo=linkedin" alt="LinkedIn" /></a>
-  <a href="https://umami.is/discord"><img src="https://img.shields.io/badge/Discord--blue?style=social&logo=discord" alt="Discord" /></a>
-</p>
+`main` is the maintained branch. Use `feat/` branches and pull requests targeting
+this repository for future changes. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-[release-shield]: https://img.shields.io/github/release/umami-software/umami.svg
-[releases-url]: https://github.com/umami-software/umami/releases
-[license-shield]: https://img.shields.io/github/license/umami-software/umami.svg
-[license-url]: https://github.com/umami-software/umami/blob/master/LICENSE
-[build-shield]: https://img.shields.io/github/actions/workflow/status/umami-software/umami/ci.yml
-[build-url]: https://github.com/umami-software/umami/actions
-[github-shield]: https://img.shields.io/badge/GitHub--blue?style=social&logo=github
-[github-url]: https://github.com/umami-software/umami
-[twitter-shield]: https://img.shields.io/badge/Twitter--blue?style=social&logo=twitter
-[twitter-url]: https://twitter.com/umami_software
-[linkedin-shield]: https://img.shields.io/badge/LinkedIn--blue?style=social&logo=linkedin
-[linkedin-url]: https://linkedin.com/company/umami-software
-[discord-shield]: https://img.shields.io/badge/Discord--blue?style=social&logo=discord
-[discord-url]: https://discord.com/invite/4dz4zcXYrQ
+CI runs unit tests, D1 integration tests, the production build, a deployment dry
+run, and browser tests against a local Worker. It needs no production credentials.
+Do not run the browser suite against the live database: tests create and delete data.
+
+## License and origin
+
+Based on [Umami](https://github.com/umami-software/umami) by Umami Software, Inc.
+The upstream [MIT license](LICENSE) is preserved. This repository is independently
+maintained and is not an official Umami Cloudflare distribution.

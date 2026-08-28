@@ -2,9 +2,20 @@ name: Cloudflare CI
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      UMAMI_ADMIN_PASSWORD: umami-ci-test-password
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -16,5 +27,36 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - name: Prepare local D1 and Worker secrets
+        run: |
+          node --input-type=module <<'JS'
+          import { randomBytes } from 'node:crypto';
+          import { writeFileSync } from 'node:fs';
+          writeFileSync('.dev.vars', `APP_SECRET=${randomBytes(32).toString('hex')}\nTWO_FACTOR_ENCRYPTION_KEY=${randomBytes(32).toString('hex')}\n`, { mode: 0o600 });
+          JS
+          pnpm db:migrate:local
+          pnpm db:create-admin --local
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'DB', '--local', '--json', '--command', "SELECT user_id AS id FROM user WHERE username = 'admin'"], { encoding: 'utf8' });
+          const id = JSON.parse(output)[0]?.results?.[0]?.id;
+          if (!id) throw new Error('Local test administrator was not created.');
+          appendFileSync(process.env.GITHUB_ENV, `UMAMI_USER_ID=${id}\n`);
+          JS
       - run: pnpm build
       - run: pnpm deploy:check
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          UMAMI_PASSWORD: ${{ env.UMAMI_ADMIN_PASSWORD }}
+          PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm start --port 3000
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

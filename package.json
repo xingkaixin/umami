@@ -4,10 +4,13 @@
   "description": "A modern, privacy-focused alternative to Google Analytics.",
   "author": "Umami Software, Inc. <hello@umami.is>",
   "license": "MIT",
-  "homepage": "https://umami.is",
+  "homepage": "https://github.com/xingkaixin/umami",
   "repository": {
     "type": "git",
-    "url": "https://github.com/umami-software/umami.git"
+    "url": "https://github.com/xingkaixin/umami.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xingkaixin/umami/issues"
   },
   "type": "module",
   "scripts": {

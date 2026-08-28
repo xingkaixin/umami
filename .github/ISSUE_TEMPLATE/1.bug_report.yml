@@ -1,5 +1,5 @@
 name: '🐛 Bug Report'
-description: Create a bug report for Umami.
+description: Report a problem with the Cloudflare edition.
 body:
   - type: textarea
     attributes:
@@ -9,27 +9,23 @@ body:
       required: true
   - type: dropdown
     attributes:
-      label: Database
-      description: What database are you using?
+      label: Environment
+      description: Where did the problem occur?
       options:
-        - PostgreSQL
-        - MySQL
-        - Umami Cloud
+        - Cloudflare Workers with remote D1
+        - Local Worker preview with local D1
+        - vinext development server with local D1
     validations:
       required: true
   - type: textarea
     attributes:
       label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      description: Include relevant browser or Worker logs. Remove passwords, tokens, cookies, and personal visitor data first.
       render: shell
   - type: input
     attributes:
-      label: Which Umami version are you using?
-      description: 'For example: 2.18.0, 2.15.1, 1.39.0, etc'
-  - type: input
-    attributes:
-      label: How are you deploying your application?
-      description: 'For example: Vercel, Railway, Docker, etc'
+      label: Which commit are you running?
+      description: Run git rev-parse --short HEAD, or provide the Worker version ID.
   - type: input
     attributes:
       label: Which browser are you using?

@@ -1,46 +1,40 @@
-# Contributing to Umami
+# Maintaining the Cloudflare edition
 
-Thanks for your interest in contributing to Umami! This document outlines the process for contributing code.
+This repository is `xingkaixin/umami`. Submit issues and pull requests here, not
+to `umami-software/umami`. The upstream project is a source reference only.
 
-## Branching
+## Changes
 
-Umami uses the following long-lived branches:
+1. Create a `feat/` branch from `main`.
+2. Reproduce the issue and inspect browser or Worker logs before changing code.
+3. Keep changes focused and add or extend tests for the affected behavior.
+4. Run `pnpm test`, `pnpm build`, and `pnpm deploy:check`.
+5. Push to your personal repository and open a pull request against `main`.
 
-- `master` — stable, released code. **Do not open PRs against `master`.**
-- `dev` — active development. **All pull requests should target `dev`.**
+Use English PR titles and descriptions. Commit messages use `<scope>: <Description>`,
+for example `database: Preserve session timestamps`. Split distinct changes into
+separate commits. Check CI and merge conflicts before requesting a review.
 
-Feature branches and fixes are merged into `dev`, and `dev` is periodically merged into `master` for releases.
+## Testing and deployment
 
-## Submitting a Pull Request
+Use Node.js 24 and pnpm 11. Follow [the Cloudflare guide](docs/cloudflare.md) for
+local setup and browser testing. Browser tests need a dedicated local D1 database.
+CI runs them against the built Worker and never deploys to Cloudflare.
 
-1. Fork the repository and create your branch from `dev`:
-   ```bash
-   git checkout dev
-   git pull origin dev
-   git checkout -b my-feature
-   ```
-2. Make your changes. Keep PRs focused — one logical change per PR.
-3. Ensure the project builds and lints cleanly:
-   ```bash
-   pnpm install
-   pnpm build
-   pnpm lint
-   ```
-4. Push your branch and open a pull request **against the `dev` branch**.
-5. Fill in the PR description with what changed and why. Link any related issues.
+`wrangler.jsonc` contains production resource IDs. Commands with `--remote`
+modify the production database; use them only for an intended production change.
+Create new Drizzle migrations for schema changes. Never rewrite a migration that
+has already run in production. Keep database backups before applying changes.
 
-PRs opened against `master` will be asked to retarget `dev`.
+Do not commit passwords, tokens, `.dev.vars`, `.wrangler`, or generated output.
+Remove credentials and visitor data from issue logs and screenshots.
 
-## Reporting Issues
+## Reporting issues
 
-- Search [existing issues](https://github.com/umami-software/umami/issues) before opening a new one.
-- For bugs, include reproduction steps, expected vs. actual behavior, and your environment (Umami version, database, browser).
-- For feature requests, describe the use case before the proposed solution.
-
-## Development Setup
-
-See the [README](./README.md) for instructions on installing dependencies, configuring the database, and running Umami locally.
+Search [existing issues](https://github.com/xingkaixin/umami/issues) first.
+Include reproduction steps, expected and actual behavior, the commit or Worker
+version ID, browser details, and whether the problem occurs locally or on Workers.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
+Contributions remain under the [MIT License](LICENSE). Preserve upstream attribution.
