@@ -1,0 +1,16 @@
+declare module '*.css';
+declare module '*.svg';
+declare module '*.json';
+declare module 'bcryptjs';
+declare module 'chartjs-adapter-date-fns';
+declare module 'date-fns-tz';
+declare module 'debug';
+declare module 'jsonwebtoken';
+declare module 'md5';
+declare module 'papaparse';
+declare module 'prettier';
+declare module 'react-simple-maps';
+declare module 'semver';
+declare module 'tsup';
+declare module 'uuid';
+declare module '@umami/esbuild-plugin-css-modules';

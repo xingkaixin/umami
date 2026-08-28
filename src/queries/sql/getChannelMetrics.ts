@@ -1,0 +1,189 @@
+import clickhouse from '@/lib/clickhouse';
+import {
+  EMAIL_DOMAINS,
+  LLM_DOMAINS,
+  PAID_AD_PARAMS,
+  SEARCH_DOMAINS,
+  SHOPPING_DOMAINS,
+  SOCIAL_DOMAINS,
+  VIDEO_DOMAINS,
+} from '@/lib/constants';
+import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
+import prisma from '@/lib/prisma';
+import type { QueryFilters } from '@/lib/types';
+
+const FUNCTION_NAME = 'getChannelMetrics';
+
+export async function getChannelMetrics(...args: [websiteId: string, filters?: QueryFilters]) {
+  return runQuery({
+    [PRISMA]: () => relationalQuery(...args),
+    [CLICKHOUSE]: () => clickhouseQuery(...args),
+  });
+}
+
+async function relationalQuery(websiteId: string, filters: QueryFilters) {
+  const { rawQuery, parseFilters } = prisma;
+  const { queryParams, filterQuery, joinSessionQuery, cohortQuery, excludeBounceQuery, dateQuery } =
+    parseFilters({
+      ...filters,
+      websiteId,
+    });
+
+  return rawQuery(
+    `
+    WITH prefix AS (
+      select case when website_event.utm_medium LIKE 'p%' OR
+          website_event.utm_medium LIKE '%ppc%' OR
+          website_event.utm_medium LIKE '%retargeting%' OR
+          website_event.utm_medium LIKE '%paid%' then 'paid' else 'organic' end prefix,
+          website_event.referrer_domain,
+          website_event.url_query,
+          website_event.utm_medium,
+          website_event.utm_source,
+          website_event.session_id,
+          website_event.visit_id,
+          website_event.event_id,
+          website_event.created_at,
+          website_event.hostname
+      from website_event
+      ${cohortQuery}
+      ${excludeBounceQuery}
+      ${joinSessionQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+        and website_event.event_type NOT IN (2, 5)
+        ${dateQuery}
+        ${filterQuery}),
+
+    channels as (
+      select case
+          when referrer_domain = '' and url_query = '' then 'direct'
+          when ${toPostgresLikeClause('url_query', PAID_AD_PARAMS)} then 'paidAds'
+          when ${toPostgresLikeClause('utm_medium', ['referral', 'app', 'link'])} then 'referral'
+          when utm_medium ilike '%affiliate%' then 'affiliate'
+          when utm_medium ilike '%sms%' or utm_source ilike '%sms%' then 'sms'
+          when ${toPostgresLikeClause('referrer_domain', LLM_DOMAINS)} then 'llm'
+          when ${toPostgresLikeClause('referrer_domain', SEARCH_DOMAINS)} or utm_medium ilike '%organic%' then concat(prefix, 'Search')
+          when ${toPostgresLikeClause('referrer_domain', SOCIAL_DOMAINS)} then concat(prefix, 'Social')
+          when ${toPostgresLikeClause('referrer_domain', EMAIL_DOMAINS)} or utm_medium ilike '%mail%' then 'email'
+          when ${toPostgresLikeClause('referrer_domain', SHOPPING_DOMAINS)} or utm_medium ilike '%shop%' then concat(prefix, 'Shopping')
+          when ${toPostgresLikeClause('referrer_domain', VIDEO_DOMAINS)} or utm_medium ilike '%video%' then concat(prefix, 'Video')
+          when referrer_domain != regexp_replace(hostname, '^www.', '') and referrer_domain != '' then 'referral'
+          else '' end AS x,
+          session_id,
+          visit_id,
+          event_id,
+          created_at
+      from prefix),
+
+    visit_channels as (
+      select
+        session_id,
+        visit_id,
+        coalesce(nullif(x, ''), 'direct') as x
+      from (
+        select
+          x,
+          session_id,
+          visit_id,
+          row_number() over (
+            partition by session_id, visit_id
+            order by case when x != '' then 0 else 1 end, created_at, event_id
+          ) as row_num
+        from channels
+      ) as ranked_channels
+      where row_num = 1)
+
+    select x, count(distinct session_id) y
+    from visit_channels
+    group by x
+    order by y desc;
+    `,
+    queryParams,
+    FUNCTION_NAME,
+  ).then(results => results.map(item => ({ ...item, y: Number(item.y) })));
+}
+
+async function clickhouseQuery(
+  websiteId: string,
+  filters: QueryFilters,
+): Promise<{ x: string; y: number }[]> {
+  const { rawQuery, parseFilters } = clickhouse;
+  const { queryParams, filterQuery, cohortQuery, excludeBounceQuery, dateQuery } = parseFilters({
+    ...filters,
+    websiteId,
+  });
+
+  const sql = `
+    WITH channels as (
+      select
+        session_id,
+        visit_id,
+        coalesce(nullIf(argMin(x, tuple(if(x != '', 0, 1), created_at, event_id)), ''), 'direct') as x
+      from (
+      select
+        case when multiSearchAny(lower(utm_medium), ['cp', 'ppc', 'retargeting', 'paid']) != 0 then 'paid' else 'organic' end prefix,
+        case
+          when referrer_domain = '' and url_query = '' then 'direct'
+          when multiSearchAny(lower(url_query), [${toClickHouseStringArray(
+            PAID_AD_PARAMS,
+          )}]) != 0 then 'paidAds'
+          when multiSearchAny(lower(utm_medium), ['referral', 'app','link']) != 0 then 'referral'
+          when position(lower(utm_medium), 'affiliate') > 0 then 'affiliate'
+          when position(lower(utm_medium), 'sms') > 0 or position(lower(utm_source), 'sms') > 0 then 'sms'
+          when multiSearchAny(lower(referrer_domain), [${toClickHouseStringArray(
+            LLM_DOMAINS,
+          )}]) != 0 then 'llm'
+          when multiSearchAny(lower(referrer_domain), [${toClickHouseStringArray(
+            SEARCH_DOMAINS,
+          )}]) != 0 or position(lower(utm_medium), 'organic') > 0 then concat(prefix, 'Search')
+          when multiSearchAny(lower(referrer_domain), [${toClickHouseStringArray(
+            SOCIAL_DOMAINS,
+          )}]) != 0 then concat(prefix, 'Social')
+          when multiSearchAny(lower(referrer_domain), [${toClickHouseStringArray(
+            EMAIL_DOMAINS,
+          )}]) != 0 or position(lower(utm_medium), 'mail') > 0 then 'email'
+          when multiSearchAny(lower(referrer_domain), [${toClickHouseStringArray(
+            SHOPPING_DOMAINS,
+          )}]) != 0 or position(lower(utm_medium), 'shop') > 0 then concat(prefix, 'Shopping')
+          when multiSearchAny(lower(referrer_domain), [${toClickHouseStringArray(
+            VIDEO_DOMAINS,
+          )}]) != 0 or position(lower(utm_medium), 'video') > 0 then concat(prefix, 'Video')
+          when referrer_domain != hostname and referrer_domain != '' then 'referral'
+        else '' end AS x,
+        session_id,
+        visit_id,
+        event_id,
+        created_at
+      from website_event
+      ${cohortQuery}
+      ${excludeBounceQuery}
+      where website_id = {websiteId:UUID}
+        and event_type NOT IN (2, 5)
+        ${dateQuery}
+        ${filterQuery}
+      )
+      group by session_id, visit_id)
+
+    select x, uniq(session_id) y
+    from channels
+    group by x
+    order by y desc;
+  `;
+
+  return rawQuery(sql, queryParams, FUNCTION_NAME);
+}
+
+function toClickHouseStringArray(arr: string[]): string {
+  // Escape backslashes first, then single quotes, for ClickHouse string literals.
+  return arr.map(p => `'${p.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`).join(', ');
+}
+
+function escapePostgresLikeValue(val: string) {
+  // Escape LIKE wildcards/backslashes so the value is matched literally, then
+  // escape single quotes for the surrounding SQL string literal.
+  return val.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/'/g, "''");
+}
+
+function toPostgresLikeClause(column: string, arr: string[]) {
+  return arr.map(val => `${column} ilike '%${escapePostgresLikeValue(val)}%'`).join(' OR\n  ');
+}

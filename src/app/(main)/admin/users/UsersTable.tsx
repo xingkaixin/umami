@@ -1,0 +1,101 @@
+import { DataColumn, DataTable, Icon, MenuItem, Modal, Row, Text } from '@umami/react-zen';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { ControlledDialog } from '@/components/common/ControlledDialog';
+import { DateDistance } from '@/components/common/DateDistance';
+import Link from '@/components/common/Link';
+import { SortableLabel } from '@/components/common/SortableLabel';
+import { useMessages } from '@/components/hooks';
+import { Edit, Trash } from '@/components/icons';
+import { MenuButton } from '@/components/input/MenuButton';
+import { ROLES } from '@/lib/constants';
+import { UserDeleteForm } from './UserDeleteForm';
+
+export function UsersTable({
+  data = [],
+  showActions = true,
+  ...props
+}: {
+  data: any[];
+  showActions?: boolean;
+}) {
+  const { t, labels } = useMessages();
+  const router = useRouter();
+  const [deleteUser, setDeleteUser] = useState(null);
+
+  return (
+    <>
+      <DataTable data={data} {...props}>
+        <DataColumn
+          id="username"
+          label={<SortableLabel label={t(labels.username)} sortKey="username" />}
+          width="2fr"
+        >
+          {(row: any) => <Link href={`/admin/users/${row.id}`}>{row.username}</Link>}
+        </DataColumn>
+        <DataColumn id="role" label={<SortableLabel label={t(labels.role)} sortKey="role" />}>
+          {(row: any) =>
+            t(labels[Object.keys(ROLES).find(key => ROLES[key] === row.role)] || labels.unknown)
+          }
+        </DataColumn>
+        <DataColumn id="websites" label={t(labels.websites)}>
+          {(row: any) => row._count.websites}
+        </DataColumn>
+        <DataColumn
+          id="created"
+          label={
+            <SortableLabel label={t(labels.created)} sortKey="createdAt" defaultDirection="desc" />
+          }
+        >
+          {(row: any) => <DateDistance date={new Date(row.createdAt)} />}
+        </DataColumn>
+        {showActions && (
+          <DataColumn id="action" align="end" width="100px">
+            {(row: any) => {
+              const { id } = row;
+
+              return (
+                <MenuButton>
+                  <MenuItem
+                    onAction={() => router.push(`/admin/users/${id}`)}
+                    data-test="link-button-edit"
+                  >
+                    <Row alignItems="center" gap>
+                      <Icon>
+                        <Edit />
+                      </Icon>
+                      <Text>{t(labels.edit)}</Text>
+                    </Row>
+                  </MenuItem>
+                  <MenuItem
+                    id="delete"
+                    onAction={() => setDeleteUser(row)}
+                    data-test="link-button-delete"
+                  >
+                    <Row alignItems="center" gap>
+                      <Icon>
+                        <Trash />
+                      </Icon>
+                      <Text>{t(labels.delete)}</Text>
+                    </Row>
+                  </MenuItem>
+                </MenuButton>
+              );
+            }}
+          </DataColumn>
+        )}
+      </DataTable>
+      <ControlledDialog>
+        <Modal isOpen={!!deleteUser}>
+          <UserDeleteForm
+            userId={deleteUser?.id}
+            username={deleteUser?.username}
+            onClose={() => {
+              setDeleteUser(null);
+            }}
+          />
+        </Modal>
+      </ControlledDialog>
+    </>
+  );
+}

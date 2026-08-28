@@ -1,0 +1,57 @@
+import { Column, Grid, Row } from '@umami/react-zen';
+import { WebsiteExpandedMenu } from '@/app/(main)/websites/[websiteId]/WebsiteExpandedMenu';
+import { OverlayScrollArea } from '@/components/common/OverlayScrollArea';
+import { useMessages, useNavigation } from '@/components/hooks';
+import { MobileMenuButton } from '@/components/input/MobileMenuButton';
+import { MetricsExpandedTable } from '@/components/metrics/MetricsExpandedTable';
+
+export function WebsiteExpandedView({
+  websiteId,
+  excludedIds = [],
+  onClose,
+}: {
+  websiteId: string;
+  excludedIds?: string[];
+  onClose?: () => void;
+}) {
+  const { t, labels } = useMessages();
+  const {
+    query: { view },
+  } = useNavigation();
+  const title = view === 'fullPath' ? t(labels.url) : t(labels[view]);
+
+  return (
+    <Column height="100%" overflow="hidden" gap>
+      <Row id="expanded-mobile-menu-button" display={{ base: 'flex', md: 'none' }}>
+        <MobileMenuButton>
+          {({ close }) => {
+            return (
+              <Column padding="3">
+                <WebsiteExpandedMenu excludedIds={excludedIds} onItemClick={close} />
+              </Column>
+            );
+          }}
+        </MobileMenuButton>
+      </Row>
+      <Grid columns={{ base: '1fr', md: 'auto 1fr' }} gap="6" overflow="hidden">
+        <Column
+          id="metrics-expanded-menu"
+          display={{ base: 'none', md: 'flex' }}
+          width="240px"
+          gap="6"
+          border="right"
+          paddingRight="3"
+          minHeight="0"
+          overflow="hidden"
+        >
+          <OverlayScrollArea style={{ height: '100%' }}>
+            <WebsiteExpandedMenu excludedIds={excludedIds} />
+          </OverlayScrollArea>
+        </Column>
+        <Column id="metrics-expanded-table" overflow="hidden">
+          <MetricsExpandedTable title={title} type={view} websiteId={websiteId} onClose={onClose} />
+        </Column>
+      </Grid>
+    </Column>
+  );
+}
