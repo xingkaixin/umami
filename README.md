@@ -17,101 +17,49 @@
 
 ---
 
-## 🚀 Getting Started
+## Cloudflare edition
 
-A detailed getting started guide can be found at [umami.is/docs](https://umami.is/docs/).
+This fork runs Umami on **Cloudflare Workers + D1**, using **vinext** and **Drizzle**.
+It does not need Vercel, PostgreSQL, Prisma, Redis, or a Node.js application server.
+The upstream Umami documentation still describes the original deployment; use the
+[Cloudflare deployment guide](docs/cloudflare.md) for this fork.
 
----
+### Local development
 
-## 🛠 Installing from Source
+Requires Node.js 24 and pnpm 11.
 
-### Requirements
-
-- A server with Node.js version 18.18+.
-- A PostgreSQL database version v12.14+.
-
-### Get the source code and install packages
-
-```bash
-git clone https://github.com/umami-software/umami.git
-cd umami
+```sh
 pnpm install
+cp .dev.vars.example .dev.vars
+# Replace both secret placeholders with separate values from openssl rand -hex 32.
+pnpm db:migrate:local
+# Supply UMAMI_ADMIN_PASSWORD through your environment (at least 12 characters).
+pnpm db:create-admin --local
+pnpm dev
 ```
 
-### Configure Umami
+Build and preview the Worker:
 
-Create an `.env` file with the following:
-
-```bash
-DATABASE_URL=connection-url
-```
-
-Optional: set `API_URL` to change the base URL used by internal UI API calls.
-Relative paths are served under `BASE_PATH`; absolute URLs are proxied through the local `/api` route.
-For example, `API_URL=/internal-api` or `API_URL=https://api.example.com/api`.
-
-Optional: set `TWO_FACTOR_ENCRYPTION_KEY` to a 64-character hex string to enable two-factor
-authentication. Generate one with `openssl rand -hex 32`. Two-factor authentication is unavailable
-and cannot be required until this key is set.
-
-The connection URL format:
-
-```bash
-postgresql://username:mypassword@localhost:5432/mydb
-```
-
-### Build the Application
-
-```bash
-pnpm run build
-```
-
-The build step will create tables in your database if you are installing for the first time. It will also create a login user with username **admin** and password **umami**.
-
-### Start the Application
-
-```bash
-pnpm run start
-```
-
-By default, this will launch the application on `http://localhost:3000`. You will need to either [proxy](https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/) requests from your web server or change the [port](https://nextjs.org/docs/api-reference/cli#production) to serve the application directly.
-
----
-
-## 🐳 Installing with Docker
-
-Umami provides Docker images as well as a Docker compose file for easy deployment.
-
-Docker image:
-
-```bash
-docker pull docker.umami.is/umami-software/umami:latest
-```
-
-Docker compose (Runs Umami with a PostgreSQL database):
-
-```bash
-docker compose up -d
-```
-
----
-
-## 🔄 Getting Updates
-
-To get the latest features, simply do a pull, install any new dependencies, and rebuild:
-
-```bash
-git pull
-pnpm install
+```sh
+pnpm test
 pnpm build
+pnpm start
 ```
 
-To update the Docker image, simply pull the new images and rebuild:
+Builds do not modify databases or create default accounts. The local preview and
+migration commands share `.wrangler/state`; neither touches a remote database.
 
-```bash
-docker compose pull
-docker compose up --force-recreate -d
-```
+### Deployment
+
+Create a D1 database, configure its ID in `wrangler.jsonc`, set Worker secrets,
+apply D1 migrations, and deploy. See [the complete procedure](docs/cloudflare.md).
+
+### Compatibility
+
+The self-hosted dashboard, collection API, teams, sharing, event/session properties,
+reports, replay, heatmaps, and two-factor authentication remain in scope. Umami's
+hosted subscription billing and Redis-backed white-label settings are not included.
+vinext is pinned to a beta release; validate upgrades before deploying them.
 
 ---
 

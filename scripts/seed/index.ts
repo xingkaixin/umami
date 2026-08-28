@@ -1,7 +1,23 @@
 /* eslint-disable no-console */
 import 'dotenv/config';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { type Prisma, PrismaClient } from '../../src/generated/prisma/client.js';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { getPlatformProxy } from 'wrangler';
+import type { D1Database } from '@cloudflare/workers-types';
+import { insertRows } from '../../src/db/insert';
+import { deleteWebsiteData } from '../../src/db/delete';
+import * as schema from '../../src/db/schema';
+import {
+  session,
+  websiteEvent,
+  eventData,
+  revenue,
+  website,
+  user,
+  report,
+  segment,
+  share,
+} from '../../src/db/schema';
 import { getSessionCountForDay } from './distributions/temporal.js';
 import {
   type EventData,
@@ -31,12 +47,7 @@ import {
 } from './sites/saas.js';
 import { formatNumber, generateDatesBetween, progressBar, subDays, uuid } from './utils.js';
 
-const BATCH_SIZE = 1000;
-
-type SessionCreateInput = Prisma.SessionCreateManyInput;
-type WebsiteEventCreateInput = Prisma.WebsiteEventCreateManyInput;
-type EventDataCreateInput = Prisma.EventDataCreateManyInput;
-type RevenueCreateInput = Prisma.RevenueCreateManyInput;
+type Database = ReturnType<typeof drizzle<typeof schema>>;
 
 export interface SeedConfig {
   days: number;
@@ -52,138 +63,33 @@ export interface SeedResult {
   revenue: number;
 }
 
-async function batchInsertSessions(
-  prisma: PrismaClient,
-  data: SessionCreateInput[],
-  verbose: boolean,
-): Promise<void> {
-  for (let i = 0; i < data.length; i += BATCH_SIZE) {
-    const batch = data.slice(i, i + BATCH_SIZE);
-    await prisma.session.createMany({ data: batch, skipDuplicates: true });
-    if (verbose) {
-      console.log(
-        `  Inserted ${Math.min(i + BATCH_SIZE, data.length)}/${data.length} session records`,
-      );
-    }
-  }
+async function findAdminUser(db: Database): Promise<string> {
+  const admin = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(and(eq(user.role, 'admin'), isNull(user.deletedAt)))
+    .get();
+  if (!admin) throw new Error('Create a local administrator before seeding demo data.');
+  return admin.id;
 }
 
-async function batchInsertEvents(
-  prisma: PrismaClient,
-  data: WebsiteEventCreateInput[],
-  verbose: boolean,
-): Promise<void> {
-  for (let i = 0; i < data.length; i += BATCH_SIZE) {
-    const batch = data.slice(i, i + BATCH_SIZE);
-    await prisma.websiteEvent.createMany({ data: batch, skipDuplicates: true });
-    if (verbose) {
-      console.log(
-        `  Inserted ${Math.min(i + BATCH_SIZE, data.length)}/${data.length} event records`,
-      );
-    }
-  }
+async function createWebsite(db: Database, name: string, domain: string, adminUserId: string) {
+  const id = uuid();
+  await db
+    .insert(website)
+    .values({ id, name, domain, userId: adminUserId, createdBy: adminUserId });
+  return id;
 }
 
-async function batchInsertEventData(
-  prisma: PrismaClient,
-  data: EventDataCreateInput[],
-  verbose: boolean,
-): Promise<void> {
-  for (let i = 0; i < data.length; i += BATCH_SIZE) {
-    const batch = data.slice(i, i + BATCH_SIZE);
-    await prisma.eventData.createMany({ data: batch, skipDuplicates: true });
-    if (verbose) {
-      console.log(
-        `  Inserted ${Math.min(i + BATCH_SIZE, data.length)}/${data.length} eventData records`,
-      );
-    }
-  }
-}
-
-async function batchInsertRevenue(
-  prisma: PrismaClient,
-  data: RevenueCreateInput[],
-  verbose: boolean,
-): Promise<void> {
-  for (let i = 0; i < data.length; i += BATCH_SIZE) {
-    const batch = data.slice(i, i + BATCH_SIZE);
-    await prisma.revenue.createMany({ data: batch, skipDuplicates: true });
-    if (verbose) {
-      console.log(
-        `  Inserted ${Math.min(i + BATCH_SIZE, data.length)}/${data.length} revenue records`,
-      );
-    }
-  }
-}
-
-async function findAdminUser(prisma: PrismaClient): Promise<string> {
-  const adminUser = await prisma.user.findFirst({
-    where: { role: 'admin' },
-    select: { id: true },
-  });
-
-  if (!adminUser) {
-    throw new Error(
-      'No admin user found in the database.\n' +
-        'Please ensure you have run the initial setup and created an admin user.\n' +
-        'The default admin user is created during first build (username: admin, password: umami).',
-    );
-  }
-
-  return adminUser.id;
-}
-
-async function createWebsite(
-  prisma: PrismaClient,
-  name: string,
-  domain: string,
-  adminUserId: string,
-): Promise<string> {
-  const websiteId = uuid();
-
-  await prisma.website.create({
-    data: {
-      id: websiteId,
-      name,
-      domain,
-      userId: adminUserId,
-      createdBy: adminUserId,
-    },
-  });
-
-  return websiteId;
-}
-
-async function clearDemoData(prisma: PrismaClient): Promise<void> {
-  console.log('Clearing existing demo data...');
-
-  const demoWebsites = await prisma.website.findMany({
-    where: {
-      OR: [{ name: BLOG_WEBSITE_NAME }, { name: SAAS_WEBSITE_NAME }],
-    },
-    select: { id: true },
-  });
-
-  const websiteIds = demoWebsites.map(w => w.id);
-
-  if (websiteIds.length === 0) {
-    console.log('  No existing demo websites found');
-    return;
-  }
-
-  console.log(`  Found ${websiteIds.length} demo website(s)`);
-
-  // Delete in correct order due to foreign key constraints
-  await prisma.revenue.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.eventData.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.sessionData.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.websiteEvent.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.session.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.segment.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.report.deleteMany({ where: { websiteId: { in: websiteIds } } });
-  await prisma.website.deleteMany({ where: { id: { in: websiteIds } } });
-
-  console.log('  Cleared existing demo data');
+async function clearDemoData(db: Database) {
+  const ids = sql`select website_id from website where name in (${BLOG_WEBSITE_NAME}, ${SAAS_WEBSITE_NAME})`;
+  await db.batch([
+    ...deleteWebsiteData(db, ids),
+    db.delete(report).where(inArray(report.websiteId, ids)),
+    db.delete(segment).where(inArray(segment.websiteId, ids)),
+    db.delete(share).where(inArray(share.entityId, ids)),
+    db.delete(website).where(inArray(website.id, ids)),
+  ]);
 }
 
 interface SiteGeneratorConfig {
@@ -196,7 +102,7 @@ interface SiteGeneratorConfig {
 }
 
 async function generateSiteData(
-  prisma: PrismaClient,
+  db: Database,
   config: SiteGeneratorConfig,
   days: Date[],
   adminUserId: string,
@@ -204,7 +110,7 @@ async function generateSiteData(
 ): Promise<{ sessions: number; events: number; eventData: number; revenue: number }> {
   console.log(`\nGenerating data for ${config.name}...`);
 
-  const websiteId = await createWebsite(prisma, config.name, config.domain, adminUserId);
+  const websiteId = await createWebsite(db, config.name, config.domain, adminUserId);
   console.log(`  Created website: ${config.name} (${websiteId})`);
 
   const siteConfig = config.getSiteConfig();
@@ -246,19 +152,19 @@ async function generateSiteData(
 
   // Batch insert all data
   console.log(`  Inserting ${formatNumber(allSessions.length)} sessions...`);
-  await batchInsertSessions(prisma, allSessions as SessionCreateInput[], verbose);
+  for (const statement of insertRows(db, session, allSessions)) await statement;
 
   console.log(`  Inserting ${formatNumber(allEvents.length)} events...`);
-  await batchInsertEvents(prisma, allEvents as WebsiteEventCreateInput[], verbose);
+  for (const statement of insertRows(db, websiteEvent, allEvents)) await statement;
 
   if (allEventData.length > 0) {
     console.log(`  Inserting ${formatNumber(allEventData.length)} event data entries...`);
-    await batchInsertEventData(prisma, allEventData as EventDataCreateInput[], verbose);
+    for (const statement of insertRows(db, eventData, allEventData)) await statement;
   }
 
   if (allRevenue.length > 0) {
     console.log(`  Inserting ${formatNumber(allRevenue.length)} revenue entries...`);
-    await batchInsertRevenue(prisma, allRevenue as RevenueCreateInput[], verbose);
+    for (const statement of insertRows(db, revenue, allRevenue)) await statement;
   }
 
   return {
@@ -269,38 +175,12 @@ async function generateSiteData(
   };
 }
 
-function createPrismaClient(): PrismaClient {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      'DATABASE_URL environment variable is not set.\n' +
-        'Please set DATABASE_URL in your .env file or environment.\n' +
-        'Example: DATABASE_URL=postgresql://user:password@localhost:5432/umami',
-    );
-  }
-
-  let schema: string | undefined;
-  try {
-    const connectionUrl = new URL(url);
-    schema = connectionUrl.searchParams.get('schema') ?? undefined;
-  } catch {
-    throw new Error(
-      'DATABASE_URL is not a valid URL.\n' +
-        'Expected format: postgresql://user:password@host:port/database\n' +
-        `Received: ${url.substring(0, 30)}...`,
-    );
-  }
-
-  const adapter = new PrismaPg({ connectionString: url }, { schema });
-
-  return new PrismaClient({
-    adapter,
-    errorFormat: 'pretty',
-  });
-}
-
 export async function seed(config: SeedConfig): Promise<SeedResult> {
-  const prisma = createPrismaClient();
+  const proxy = await getPlatformProxy<{ DB: D1Database }>({
+    configPath: 'wrangler.jsonc',
+    persist: { path: '.wrangler/state/v3' },
+  });
+  const db = drizzle(proxy.env.DB, { schema });
 
   try {
     const endDate = new Date();
@@ -315,16 +195,16 @@ export async function seed(config: SeedConfig): Promise<SeedResult> {
     console.log(`  Clear existing: ${config.clear}`);
 
     if (config.clear) {
-      await clearDemoData(prisma);
+      await clearDemoData(db);
     }
 
     // Find admin user to own the demo websites
-    const adminUserId = await findAdminUser(prisma);
+    const adminUserId = await findAdminUser(db);
     console.log(`  Using admin user: ${adminUserId}`);
 
     // Generate Blog site (low traffic)
     const blogResults = await generateSiteData(
-      prisma,
+      db,
       {
         name: BLOG_WEBSITE_NAME,
         domain: BLOG_WEBSITE_DOMAIN,
@@ -339,7 +219,7 @@ export async function seed(config: SeedConfig): Promise<SeedResult> {
 
     // Generate SaaS site (high traffic)
     const saasResults = await generateSiteData(
-      prisma,
+      db,
       {
         name: SAAS_WEBSITE_NAME,
         domain: SAAS_WEBSITE_DOMAIN,
@@ -373,6 +253,6 @@ export async function seed(config: SeedConfig): Promise<SeedResult> {
 
     return result;
   } finally {
-    await prisma.$disconnect();
+    await proxy.dispose();
   }
 }

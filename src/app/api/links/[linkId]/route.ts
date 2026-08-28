@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, ok, serverError, unauthorized } from '@/lib/response';
 import { canDeleteLink, canUpdateLink, canViewLink } from '@/permissions';
-import { deleteLink, getLink, updateLink } from '@/queries/prisma';
+import { deleteLink, getLink, updateLink } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ linkId: string }> }) {
   const { auth, error } = await parseRequest(request);

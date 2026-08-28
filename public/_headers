@@ -1,0 +1,7 @@
+/script.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400, must-revalidate
+
+/recorder.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400, must-revalidate

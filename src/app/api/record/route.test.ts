@@ -15,7 +15,7 @@ vi.mock('@/lib/request', () => ({
   parseRequest: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getWebsite: vi.fn(),
 }));
 

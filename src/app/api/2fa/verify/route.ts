@@ -1,18 +1,25 @@
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
-import { getBearerToken, saveAuth } from '@/lib/auth';
+import { getBearerToken } from '@/lib/auth';
 import { ROLES } from '@/lib/constants';
-import { secret } from '@/lib/crypto';
+import { hash, secret } from '@/lib/crypto';
 import { createSecureToken, parseSecureToken } from '@/lib/jwt';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, notFound, serviceUnavailable, unauthorized } from '@/lib/response';
 import { verifyBackupCode } from '@/lib/two-factor/backup-codes';
-import { decryptSecret, getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
+import {
+  decryptSecret,
+  getTwoFactorConfigurationError,
+  isTwoFactorConfigured,
+} from '@/lib/two-factor/crypto';
 import { checkRateLimit, recordFailedAttempt, resetRateLimit } from '@/lib/two-factor/rate-limit';
-import { isOtpReplayed, markOtpUsed } from '@/lib/two-factor/replay-prevention';
+import { isOtpReplayed, consumeOtp } from '@/queries/drizzle/twoFactor';
 import { verifyTotp } from '@/lib/two-factor/totp';
-import { getAllUserTeams, getUser } from '@/queries/prisma';
-import redis from '@/lib/redis';
+import { getAllUserTeams, getUser } from '@/queries/drizzle';
+import {
+  consumeBackupCode,
+  getTwoFactorAuth,
+  getUnusedBackupCodes,
+} from '@/queries/drizzle/twoFactor';
 
 export async function POST(request: Request) {
   if (process.env.CLOUD_MODE) {
@@ -44,13 +51,13 @@ export async function POST(request: Request) {
   }
 
   const userId = payload.userId as string;
-  const user = await getUser(userId);
+  const user = await getUser(userId, { includePassword: true });
 
   if (!user) {
     return unauthorized();
   }
 
-  const twoFactor = await prisma.client.twoFactorAuth.findUnique({ where: { userId } });
+  const twoFactor = await getTwoFactorAuth(userId);
 
   if (!twoFactor?.isEnabled) {
     return badRequest({
@@ -74,9 +81,7 @@ export async function POST(request: Request) {
   }
 
   if (body.backupCode) {
-    const unusedCodes = await prisma.client.twoFactorBackupCode.findMany({
-      where: { userId, used: false },
-    });
+    const unusedCodes = await getUnusedBackupCodes(userId);
     const hashes = unusedCodes.map(c => c.codeHash);
     const matchIndex = await verifyBackupCode(body.backupCode, hashes);
 
@@ -89,12 +94,9 @@ export async function POST(request: Request) {
       });
     }
 
-    const consumed = await prisma.client.twoFactorBackupCode.updateMany({
-      where: { id: unusedCodes[matchIndex].id, used: false },
-      data: { used: true },
-    });
+    const consumed = await consumeBackupCode(unusedCodes[matchIndex].id);
 
-    if (consumed.count === 0) {
+    if (!consumed) {
       const { lockedUntil } = await recordFailedAttempt(userId);
       return badRequest({
         code: 'two-factor-error-invalid-backup-code',
@@ -122,18 +124,15 @@ export async function POST(request: Request) {
       });
     }
 
-    await markOtpUsed(userId, token);
+    if (!(await consumeOtp(userId, token, twoFactor.secret))) {
+      return badRequest({ code: 'two-factor-error-code-used', message: 'Code already used' });
+    }
     await resetRateLimit(userId);
   }
 
   const { id, role, createdAt, username } = user;
 
-  let fullToken: string;
-  if (redis.enabled) {
-    fullToken = await saveAuth({ userId: id, role });
-  } else {
-    fullToken = createSecureToken({ userId: id, role }, secret());
-  }
+  const fullToken = createSecureToken({ userId: id, role, pwd: hash(user.password) }, secret());
 
   const teams = await getAllUserTeams(id);
 

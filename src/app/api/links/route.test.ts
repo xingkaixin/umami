@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { parseRequest } from '@/lib/request';
 import { canCreateTeamWebsite, canCreateWebsite } from '@/permissions';
-import { createLink } from '@/queries/prisma';
+import { createLink } from '@/queries/drizzle';
 import { POST } from './route';
 
 vi.mock('@/lib/request', () => ({
@@ -14,7 +14,7 @@ vi.mock('@/permissions', () => ({
   canCreateWebsite: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   createLink: vi.fn(),
   getUserLinks: vi.fn(),
 }));
@@ -53,12 +53,12 @@ test('POST requires link slugs to be at least 8 characters so create matches edi
     safeParse: (value: unknown) => { success: boolean };
   };
 
-  expect(schema.safeParse({ name: 'Docs', url: 'https://example.com', slug: '1234567' }).success).toBe(
-    false,
-  );
-  expect(schema.safeParse({ name: 'Docs', url: 'https://example.com', slug: '12345678' }).success).toBe(
-    true,
-  );
+  expect(
+    schema.safeParse({ name: 'Docs', url: 'https://example.com', slug: '1234567' }).success,
+  ).toBe(false);
+  expect(
+    schema.safeParse({ name: 'Docs', url: 'https://example.com', slug: '12345678' }).success,
+  ).toBe(true);
   expect(createLinkMock).toHaveBeenCalledWith({
     id: expect.any(String),
     name: 'Docs',

@@ -1,19 +1,15 @@
 import 'dotenv/config';
-import createNextIntlPlugin from 'next-intl/plugin';
 import pkg from './package.json' with { type: 'json' };
 import { getContentSecurityPolicy } from './src/lib/csp';
-
-const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const TRACKER_SCRIPT = '/script.js';
 const RECORDER_SCRIPT = '/recorder.js';
 
 const isProd = process.env.NODE_ENV === 'production';
-const isVercel = Boolean(process.env.VERCEL);
 
 const apiUrl = process.env.API_URL || '';
 const basePath = process.env.BASE_PATH || '';
-const cloudMode = process.env.CLOUD_MODE || '';
+const cloudMode = '';
 const cloudUrl = process.env.CLOUD_URL || '';
 const collectApiEndpoint = process.env.COLLECT_API_ENDPOINT || '';
 const corsMaxAge = process.env.CORS_MAX_AGE || '';
@@ -198,15 +194,8 @@ if (trackerScriptName) {
   }
 }
 
-if (isProd && cloudMode) {
-  rewrites.push({
-    source: '/script.js',
-    destination: 'https://cloud.umami.is/script.js',
-  });
-}
-
 /** @type {import('next').NextConfig} */
-export default withNextIntl({
+export default {
   reactStrictMode: false,
   env: {
     apiUrl,
@@ -220,13 +209,6 @@ export default withNextIntl({
     selfRecord,
   },
   basePath,
-  output: isVercel ? undefined : 'standalone',
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  experimental: {
-    useTypeScriptCli: true,
-  },
   async headers() {
     return headers;
   },
@@ -246,4 +228,4 @@ export default withNextIntl({
   async redirects() {
     return [...redirects];
   },
-});
+};

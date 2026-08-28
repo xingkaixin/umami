@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
+import { setGlobalTwoFactorRequired } from '@/queries/drizzle/twoFactor';
 import { parseRequest } from '@/lib/request';
 import { json, notFound, serviceUnavailable, unauthorized } from '@/lib/response';
 import { getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
@@ -28,11 +28,7 @@ export async function POST(request: Request) {
     return serviceUnavailable(getTwoFactorConfigurationError());
   }
 
-  await prisma.client.appSetting.upsert({
-    where: { key: 'twoFactorRequiredGlobal' },
-    update: { value: String(required) },
-    create: { key: 'twoFactorRequiredGlobal', value: String(required) },
-  });
+  await setGlobalTwoFactorRequired(required);
 
   return json({ ok: true, required });
 }

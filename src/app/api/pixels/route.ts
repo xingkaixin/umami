@@ -4,7 +4,7 @@ import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { pagingParams, searchParams, sortingParams } from '@/lib/schema';
 import { canCreateTeamWebsite, canCreateWebsite } from '@/permissions';
-import { createPixel, getUserPixels } from '@/queries/prisma';
+import { createPixel, getUserPixels } from '@/queries/drizzle';
 
 export async function GET(request: Request) {
   const schema = z.object({

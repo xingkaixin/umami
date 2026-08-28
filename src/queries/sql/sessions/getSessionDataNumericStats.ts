@@ -1,121 +1,55 @@
-import clickhouse from '@/lib/clickhouse';
+import { getPropertyFilterQuery, parseFilters } from '@/db/filters';
+import { rawQuery } from '@/db/query';
+import { percentileSQL, rankedQuery } from '@/db/stats';
 import { EVENT_TYPE } from '@/lib/constants';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import prisma from '@/lib/prisma';
 import type { EventDataNumericStats, PropertyFilter, QueryFilters } from '@/lib/types';
 
-const FUNCTION_NAME = 'getSessionDataNumericStats';
-
 export async function getSessionDataNumericStats(
-  ...args: [
-    websiteId: string,
-    propertyName: string,
-    filters: QueryFilters,
-    propertyFilters?: PropertyFilter[],
-  ]
-): Promise<EventDataNumericStats> {
-  return runQuery({
-    [PRISMA]: () => relationalQuery(...args),
-    [CLICKHOUSE]: () => clickhouseQuery(...args),
-  }).then(results => results?.[0]);
-}
-
-async function relationalQuery(
   websiteId: string,
   propertyName: string,
   filters: QueryFilters,
   propertyFilters: PropertyFilter[] = [],
-) {
+): Promise<EventDataNumericStats> {
   const { timezone = 'utc' } = filters;
-  const { rawQuery, parseFilters, getPropertyFilterQuery } = prisma;
-  const { filterQuery, cohortQuery, joinSessionQuery, queryParams } = parseFilters({
+  const { filterQuery, cohortQuery, joinSessionQuery, queryParams } = await parseFilters({
     ...filters,
     websiteId,
     timezone,
   });
-  const { sql: pfSQL, params: pfParams } = getPropertyFilterQuery(
+  const { sql: pfSQL, params: pfParams } = await getPropertyFilterQuery(
     propertyFilters,
     'session',
     timezone,
+    queryParams,
   );
 
   return rawQuery(
-    `
-    with filtered_sessions as (
+    `${rankedQuery(
+      `    with filtered_sessions as (
       select distinct website_event.session_id, website_event.website_id
       from website_event
       ${cohortQuery}
       ${joinSessionQuery}
-      where website_event.website_id = {{websiteId::uuid}}
+      where website_event.website_id = {{websiteId}}
         and website_event.created_at between {{startDate}} and {{endDate}}
         and website_event.event_type != ${EVENT_TYPE.performance}
         ${filterQuery}
         ${pfSQL}
     )
-    select
-      coalesce(sum(cast(session_data.number_value as decimal)), 0) as "total",
-      coalesce(avg(cast(session_data.number_value as decimal)), 0) as "average",
-      coalesce(percentile_cont(0.5) within group (order by session_data.number_value), 0) as "median",
-      coalesce(max(session_data.number_value), 0) as "max",
-      coalesce(min(session_data.number_value), 0) as "min"
+    select cast(session_data.number_value as real) as value
     from session_data
     join filtered_sessions
       on filtered_sessions.session_id = session_data.session_id
         and filtered_sessions.website_id = session_data.website_id
-    where session_data.website_id = {{websiteId::uuid}}
+    where session_data.website_id = {{websiteId}}
       and session_data.data_key = {{propertyName}}
-      and session_data.data_type = 2
-    `,
+      and session_data.data_type = 2`,
+      ['value'],
+    )}
+    select coalesce(sum(value), 0) as total, coalesce(avg(value), 0) as average,
+      coalesce(${percentileSQL('value', 0.5)}, 0) as median,
+      coalesce(max(value), 0) as max, coalesce(min(value), 0) as min
+    from ranked`,
     { ...queryParams, propertyName, ...pfParams },
-    FUNCTION_NAME,
-  );
-}
-
-async function clickhouseQuery(
-  websiteId: string,
-  propertyName: string,
-  filters: QueryFilters,
-  propertyFilters: PropertyFilter[] = [],
-): Promise<EventDataNumericStats[]> {
-  const { timezone = 'UTC' } = filters;
-  const { rawQuery, parseFilters, getPropertyFilterQuery } = clickhouse;
-  const { filterQuery, cohortQuery, queryParams } = parseFilters({
-    ...filters,
-    websiteId,
-    timezone,
-  });
-  const { sql: pfSQL, params: pfParams } = getPropertyFilterQuery(
-    propertyFilters,
-    'session',
-    timezone,
-  );
-
-  return rawQuery(
-    `
-    with filtered_sessions as (
-      select distinct website_event.session_id
-      from website_event
-      ${cohortQuery}
-      where website_event.website_id = {websiteId:UUID}
-        and website_event.created_at between {startDate:DateTime64} and {endDate:DateTime64}
-        and website_event.event_type != ${EVENT_TYPE.performance}
-      ${filterQuery}
-      ${pfSQL}
-    )
-    select
-      if(count() = 0, 0, sum(session_data.number_value)) as total,
-      if(count() = 0, 0, avg(session_data.number_value)) as average,
-      if(count() = 0, 0, median(session_data.number_value)) as median,
-      if(count() = 0, 0, max(session_data.number_value)) as max,
-      if(count() = 0, 0, min(session_data.number_value)) as min
-    from session_data final
-    join filtered_sessions
-      on filtered_sessions.session_id = session_data.session_id
-    where session_data.website_id = {websiteId:UUID}
-      and session_data.data_key = {propertyName:String}
-      and session_data.data_type = 2
-    `,
-    { ...queryParams, propertyName, ...pfParams },
-    FUNCTION_NAME,
-  );
+  ).then(results => results?.[0]);
 }

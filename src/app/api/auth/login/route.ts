@@ -1,15 +1,13 @@
 import { z } from 'zod';
-import { saveAuth } from '@/lib/auth';
 import { ROLES } from '@/lib/constants';
 import { hash, secret } from '@/lib/crypto';
 import { createSecureToken } from '@/lib/jwt';
 import { checkPassword } from '@/lib/password';
-import prisma from '@/lib/prisma';
-import redis from '@/lib/redis';
+import { getTwoFactorAuth } from '@/queries/drizzle/twoFactor';
 import { parseRequest } from '@/lib/request';
 import { json, serviceUnavailable, unauthorized } from '@/lib/response';
 import { getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
-import { getAllUserTeams, getUserByUsername } from '@/queries/prisma';
+import { getAllUserTeams, getUserByUsername } from '@/queries/drizzle';
 
 export async function POST(request: Request) {
   const schema = z.object({
@@ -35,9 +33,7 @@ export async function POST(request: Request) {
   const cloudMode = !!process.env.CLOUD_MODE;
 
   // Check if 2FA is enabled for this user
-  const twoFactor = !cloudMode
-    ? await prisma.client.twoFactorAuth.findUnique({ where: { userId: id } })
-    : null;
+  const twoFactor = !cloudMode ? await getTwoFactorAuth(id) : null;
 
   if (twoFactor?.isEnabled) {
     if (!isTwoFactorConfigured()) {
@@ -52,13 +48,7 @@ export async function POST(request: Request) {
   // Bind token to password hash so a password change invalidates old tokens.
   const pwd = hash(user.password);
 
-  let token: string;
-
-  if (redis.enabled) {
-    token = await saveAuth({ userId: id, role, pwd });
-  } else {
-    token = createSecureToken({ userId: user.id, role, pwd }, secret());
-  }
+  const token = createSecureToken({ userId: id, role, pwd }, secret());
 
   const teams = await getAllUserTeams(id);
 

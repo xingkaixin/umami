@@ -9,7 +9,7 @@ import {
   canViewAuthenticatedWebsite,
   canViewWebsiteSection,
 } from '@/permissions';
-import { createReport, getReports } from '@/queries/prisma';
+import { createReport, getReports } from '@/queries/drizzle';
 
 export async function GET(request: Request) {
   const schema = z.object({
@@ -40,18 +40,7 @@ export async function GET(request: Request) {
     return unauthorized();
   }
 
-  const data = await getReports(
-    {
-      where: {
-        websiteId,
-        type,
-        website: {
-          deletedAt: null,
-        },
-      },
-    },
-    filters,
-  );
+  const data = await getReports({ websiteId, type, activeWebsite: true }, filters);
 
   return json(data);
 }

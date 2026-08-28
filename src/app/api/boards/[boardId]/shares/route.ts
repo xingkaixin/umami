@@ -6,7 +6,7 @@ import { parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { anyObjectParam, filterParams, pagingParams } from '@/lib/schema';
 import { canUpdateBoard, canViewBoard } from '@/permissions';
-import { createShare, getSharesByEntityId } from '@/queries/prisma';
+import { createShare, getSharesByEntityId } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ boardId: string }> }) {
   const schema = z.object({

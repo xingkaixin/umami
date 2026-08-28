@@ -1,7 +1,7 @@
 import { Loading } from '@umami/react-zen';
 import { createContext, type ReactNode } from 'react';
 import { useUserQuery } from '@/components/hooks/queries/useUserQuery';
-import type { User } from '@/generated/prisma/client';
+import type { User } from '@/db/schema';
 
 export const UserContext = createContext<User>(null);
 

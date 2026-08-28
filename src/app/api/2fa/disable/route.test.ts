@@ -9,12 +9,6 @@ vi.mock('@/lib/request', () => ({
   parseRequest: mocks.parseRequest,
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    client: {},
-  },
-}));
-
 vi.mock('@/lib/two-factor/crypto', () => ({
   decryptSecret: vi.fn(),
   getTwoFactorConfigurationError: () => ({
@@ -30,11 +24,6 @@ vi.mock('@/lib/two-factor/rate-limit', () => ({
   resetRateLimit: vi.fn(),
 }));
 
-vi.mock('@/lib/two-factor/replay-prevention', () => ({
-  isOtpReplayed: vi.fn(),
-  markOtpUsed: vi.fn(),
-}));
-
 vi.mock('@/lib/two-factor/totp', () => ({
   verifyTotp: vi.fn(),
 }));
@@ -43,7 +32,7 @@ vi.mock('@/lib/password', () => ({
   checkPassword: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma/user', () => ({
+vi.mock('@/queries/drizzle/user', () => ({
   getUser: vi.fn(),
 }));
 

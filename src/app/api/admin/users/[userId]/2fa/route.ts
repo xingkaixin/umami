@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
 import { parseRequest } from '@/lib/request';
 import { json, notFound, serviceUnavailable, unauthorized } from '@/lib/response';
 import { getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
-import { updateUser } from '@/queries/prisma/user';
 import { canEnforceTwoFactorAuthForUser } from '@/permissions';
+import { getTwoFactorAuth, resetTwoFactorAuth } from '@/queries/drizzle/twoFactor';
+import { updateUser } from '@/queries/drizzle/user';
 
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   if (process.env.CLOUD_MODE) {
@@ -23,7 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
 
   const { userId } = await params;
 
-  const twoFactor = await prisma.client.twoFactorAuth.findUnique({ where: { userId } });
+  const twoFactor = await getTwoFactorAuth(userId);
 
   return json({ isEnabled: twoFactor?.isEnabled ?? false });
 }
@@ -57,7 +57,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ use
   return json({ ok: true, userId: user.id, twoFactorRequired: required });
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ userId: string }> }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ userId: string }> },
+) {
   if (process.env.CLOUD_MODE) {
     return notFound();
   }
@@ -74,21 +77,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ u
 
   const { userId } = await params;
 
-  const [twoFactorAuth, backupCodes, otpUsed, rateLimit] = await prisma.transaction([
-    prisma.client.twoFactorAuth.deleteMany({ where: { userId } }),
-    prisma.client.twoFactorBackupCode.deleteMany({ where: { userId } }),
-    prisma.client.twoFactorOtpUsed.deleteMany({ where: { userId } }),
-    prisma.client.twoFactorRateLimit.deleteMany({ where: { userId } }),
-  ]);
-
-  return json({
-    ok: true,
-    userId,
-    reset: {
-      twoFactorAuth: twoFactorAuth.count,
-      backupCodes: backupCodes.count,
-      otpUsed: otpUsed.count,
-      rateLimit: rateLimit.count,
-    },
-  });
+  const reset = await resetTwoFactorAuth(userId);
+  return json({ ok: true, userId, reset });
 }

@@ -6,6 +6,9 @@ import { useEffect } from 'react';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { useLocale } from '@/components/hooks';
 import 'chartjs-adapter-date-fns';
+// Keep global styles in the client graph so vinext includes them in the initial HTML.
+import '@umami/react-zen/styles.full.css';
+import './global.css';
 
 const client = new QueryClient({
   defaultOptions: {

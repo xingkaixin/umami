@@ -1,8 +1,7 @@
-import { isRelationalOnly } from '@/lib/db';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, notFound, ok, unauthorized } from '@/lib/response';
 import { canDeleteWebsite, canViewWebsiteSection } from '@/permissions';
-import { deleteSession } from '@/queries/prisma';
+import { deleteSession } from '@/queries/drizzle';
 import { getLinkedDistinctIds, getLinkedSessionIds, getWebsiteSession } from '@/queries/sql';
 
 export async function GET(
@@ -16,7 +15,7 @@ export async function GET(
   }
 
   const { websiteId, sessionId } = await params;
-  const canDelete = isRelationalOnly() && (await canDeleteWebsite(auth, websiteId));
+  const canDelete = await canDeleteWebsite(auth, websiteId);
 
   if (
     !(await canViewWebsiteSection(auth, websiteId, ['sessions', 'events', 'realtime', 'revenue']))
@@ -65,10 +64,6 @@ export async function DELETE(
 
   if (error) {
     return error();
-  }
-
-  if (!isRelationalOnly()) {
-    return badRequest({ message: 'Session deletion is only available with relational storage.' });
   }
 
   const { websiteId, sessionId } = await params;

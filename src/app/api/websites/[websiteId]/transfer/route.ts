@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
 import { canTransferWebsiteToTeam, canTransferWebsiteToUser } from '@/permissions';
-import { updateWebsite } from '@/queries/prisma';
+import { updateWebsite } from '@/queries/drizzle';
 
 export async function POST(
   request: Request,

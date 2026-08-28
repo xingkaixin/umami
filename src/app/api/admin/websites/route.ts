@@ -4,7 +4,7 @@ import { parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { pagingParams, searchParams, sortingParams } from '@/lib/schema';
 import { canViewAllWebsites } from '@/permissions';
-import { getWebsites } from '@/queries/prisma/website';
+import { getWebsites } from '@/queries/drizzle/website';
 
 export async function GET(request: Request) {
   const schema = z.object({
@@ -23,37 +23,7 @@ export async function GET(request: Request) {
     return unauthorized();
   }
 
-  const websites = await getWebsites(
-    {
-      include: {
-        user: {
-          where: {
-            deletedAt: null,
-          },
-          select: {
-            username: true,
-            id: true,
-          },
-        },
-        team: {
-          where: {
-            deletedAt: null,
-          },
-          include: {
-            members: {
-              where: {
-                role: ROLES.teamOwner,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    },
-    query,
-  );
+  const websites = await getWebsites(query, { includeUser: true, includeTeam: true });
 
   return json(websites);
 }

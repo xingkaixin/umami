@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { getLink, getTeamUser } from '@/queries/prisma';
+import { getLink, getTeamUser } from '@/queries/drizzle';
 import { canDeleteLink, canUpdateLink, canViewLink } from './link';
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getLink: vi.fn(),
   getTeamUser: vi.fn(),
 }));

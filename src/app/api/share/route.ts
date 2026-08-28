@@ -5,7 +5,7 @@ import { parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { anyObjectParam } from '@/lib/schema';
 import { canUpdateEntity } from '@/permissions';
-import { createShare } from '@/queries/prisma';
+import { createShare } from '@/queries/drizzle';
 
 export async function POST(request: Request) {
   const schema = z.object({

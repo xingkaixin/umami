@@ -1,26 +1,13 @@
-import clickhouse from '@/lib/clickhouse';
+import { getSearchSQL } from '@/db/filters';
+import { rawQuery } from '@/db/query';
 import { FILTER_COLUMNS, SESSION_COLUMNS } from '@/lib/constants';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
 
 const SESSION_DB_COLUMNS = new Set(
   SESSION_COLUMNS.map(col => FILTER_COLUMNS[col as keyof typeof FILTER_COLUMNS]).filter(Boolean),
 );
 
-const FUNCTION_NAME = 'getValues';
-
-export async function getValues(
-  ...args: [websiteId: string, column: string, filters: QueryFilters]
-) {
-  return runQuery({
-    [PRISMA]: () => relationalQuery(...args),
-    [CLICKHOUSE]: () => clickhouseQuery(...args),
-  });
-}
-
-async function relationalQuery(websiteId: string, column: string, filters: QueryFilters) {
-  const { rawQuery, getSearchSQL } = prisma;
+export async function getValues(websiteId: string, column: string, filters: QueryFilters) {
   const params = {};
   const { startDate, endDate, search } = filters;
 
@@ -28,7 +15,7 @@ async function relationalQuery(websiteId: string, column: string, filters: Query
   let excludeDomain = '';
 
   if (column === 'referrer_domain') {
-    excludeDomain = `and website_event.referrer_domain != regexp_replace(website_event.hostname, '^www.', '')
+    excludeDomain = `and website_event.referrer_domain != (case when substr(website_event.hostname, 1, 4) = 'www.' then substr(website_event.hostname, 5) else website_event.hostname end)
       and website_event.referrer_domain != ''`;
   }
 
@@ -55,7 +42,7 @@ async function relationalQuery(websiteId: string, column: string, filters: Query
       `
       select ${column} as "value", count(*) as "count"
       from session
-      where website_id = {{websiteId::uuid}}
+      where website_id = {{websiteId}}
         and created_at between {{startDate}} and {{endDate}}
         ${searchQuery}
       group by 1
@@ -63,7 +50,6 @@ async function relationalQuery(websiteId: string, column: string, filters: Query
       limit 10
       `,
       { websiteId, startDate, endDate, search: `%${search}%`, ...params },
-      FUNCTION_NAME,
     );
   }
 
@@ -71,7 +57,7 @@ async function relationalQuery(websiteId: string, column: string, filters: Query
     `
     select ${column} as "value", count(*) as "count"
     from website_event
-    where website_event.website_id = {{websiteId::uuid}}
+    where website_event.website_id = {{websiteId}}
       and website_event.created_at between {{startDate}} and {{endDate}}
       ${searchQuery}
       ${excludeDomain}
@@ -80,59 +66,5 @@ async function relationalQuery(websiteId: string, column: string, filters: Query
     limit 10
     `,
     { websiteId, startDate, endDate, search: `%${search}%`, ...params },
-    FUNCTION_NAME,
-  );
-}
-
-async function clickhouseQuery(websiteId: string, column: string, filters: QueryFilters) {
-  const { rawQuery, getSearchSQL } = clickhouse;
-  const params = {};
-  const { startDate, endDate, search } = filters;
-
-  let searchQuery = '';
-  let excludeDomain = '';
-
-  if (column === 'referrer_domain') {
-    excludeDomain = `and referrer_domain != hostname and referrer_domain != ''`;
-  }
-
-  if (search) {
-    if (decodeURIComponent(search).includes(',')) {
-      searchQuery = `AND (${decodeURIComponent(search)
-        .split(',')
-        .slice(0, 5)
-        .map((value: string, index: number) => {
-          const key = `search${index}`;
-
-          params[key] = value;
-
-          return getSearchSQL(column, key).replace('and ', '');
-        })
-        .join(' OR ')})`;
-    } else {
-      searchQuery = getSearchSQL(column);
-    }
-  }
-
-  return rawQuery(
-    `
-    select ${column} as "value", count(*) as "count"
-    from website_event
-    where website_id = {websiteId:UUID}
-      and created_at between {startDate:DateTime64} and {endDate:DateTime64}
-      ${searchQuery}
-      ${excludeDomain}
-    group by 1
-    order by 2 desc
-    limit 10
-    `,
-    {
-      websiteId,
-      startDate,
-      endDate,
-      search,
-      ...params,
-    },
-    FUNCTION_NAME,
   );
 }

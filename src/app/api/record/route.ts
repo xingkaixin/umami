@@ -6,12 +6,11 @@ import { corsPreflight, withCorsHeaders } from '@/lib/cors';
 import { secret } from '@/lib/crypto';
 import { getClientInfo, hasBlockedIp } from '@/lib/detect';
 import { parseToken } from '@/lib/jwt';
-import { fetchAccount, fetchTeam } from '@/lib/load';
 import { getRecorderConfig } from '@/lib/recorder';
 import { getReplayEventCount } from '@/lib/replay';
 import { parseRequest } from '@/lib/request';
 import { badRequest, forbidden, json, payloadTooLarge, serverError } from '@/lib/response';
-import { getWebsite } from '@/queries/prisma';
+import { getWebsite } from '@/queries/drizzle';
 import { saveRecording } from '@/queries/sql';
 import { saveHeatmapEvents } from '@/queries/sql/heatmap/saveHeatmapEvents';
 
@@ -144,7 +143,6 @@ export async function POST(request: Request) {
 
     const { sessionId, visitId } = cache;
 
-    // Query directly to avoid stale Redis cache for recorderEnabled
     const website = await getWebsite(websiteId);
 
     if (!website) {
@@ -157,18 +155,6 @@ export async function POST(request: Request) {
 
     if (!website.recorderEnabled) {
       return withCorsHeaders(json({ ok: false, reason: 'recorder_disabled' }));
-    }
-
-    if (process.env.CLOUD_MODE) {
-      const account = website.teamId
-        ? await fetchTeam(website.teamId)
-        : website.userId
-          ? await fetchAccount(website.userId)
-          : null;
-
-      if (!account?.isBusiness && !account?.isNoBilling) {
-        return withCorsHeaders(forbidden({ message: 'Business subscription required.' }));
-      }
     }
 
     // Client info for bot/IP checks

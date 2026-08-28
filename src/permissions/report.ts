@@ -1,4 +1,4 @@
-import type { Report } from '@/generated/prisma/client';
+import type { Report } from '@/db/schema';
 import type { Auth } from '@/lib/types';
 import type { ShareSection } from './share';
 import { canViewWebsiteSection } from './share';

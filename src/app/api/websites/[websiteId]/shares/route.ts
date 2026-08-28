@@ -6,7 +6,7 @@ import { parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { anyObjectParam, filterParams, pagingParams } from '@/lib/schema';
 import { canUpdateWebsite, canViewAuthenticatedWebsite } from '@/permissions';
-import { createShare, getSharesByEntityId } from '@/queries/prisma';
+import { createShare, getSharesByEntityId } from '@/queries/drizzle';
 
 export async function GET(
   request: Request,

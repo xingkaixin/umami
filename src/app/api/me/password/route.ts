@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { checkPassword, hashPassword } from '@/lib/password';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json } from '@/lib/response';
-import { getUser, updateUser } from '@/queries/prisma/user';
+import { getUser, updateUser } from '@/queries/drizzle/user';
 
 export async function POST(request: Request) {
   const schema = z.object({

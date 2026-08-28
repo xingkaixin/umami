@@ -3,7 +3,7 @@ import { parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { pagingParams, reportTypeParam } from '@/lib/schema';
 import { canViewAuthenticatedWebsite } from '@/permissions';
-import { getReports } from '@/queries/prisma';
+import { getReports } from '@/queries/drizzle';
 
 export async function GET(
   request: Request,
@@ -27,19 +27,7 @@ export async function GET(
     return unauthorized();
   }
 
-  const data = await getReports(
-    {
-      where: {
-        websiteId,
-        type,
-      },
-    },
-    {
-      page,
-      pageSize,
-      search,
-    },
-  );
+  const data = await getReports({ websiteId, type }, { page, pageSize, search });
 
   return json(data);
 }

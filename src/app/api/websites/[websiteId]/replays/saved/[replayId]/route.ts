@@ -6,7 +6,7 @@ import {
   createReplaySaved,
   deleteReplaySaved,
   getReplaySaved,
-} from '@/queries/prisma/sessionReplay';
+} from '@/queries/drizzle/sessionReplay';
 
 export async function GET(
   request: Request,

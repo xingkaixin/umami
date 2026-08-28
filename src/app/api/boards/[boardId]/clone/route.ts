@@ -1,4 +1,3 @@
-import type { Prisma } from '@/generated/prisma/client';
 import { z } from 'zod';
 import { BOARD_TYPES, normalizeBoardType } from '@/lib/boards';
 import type { BoardParameters } from '@/lib/types';
@@ -13,7 +12,7 @@ import {
   hasValidBoardReports,
   stripInvalidBoardReports,
 } from '@/permissions';
-import { createBoard, getBoard } from '@/queries/prisma';
+import { createBoard, getBoard } from '@/queries/drizzle';
 
 export async function POST(request: Request, { params }: { params: Promise<{ boardId: string }> }) {
   const schema = z.object({
@@ -70,9 +69,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ boa
     type: sourceType,
     name: body.name ?? sourceBoard.name,
     description: body.description ?? sourceBoard.description,
-    parameters: sanitizedParameters as Prisma.InputJsonValue,
+    parameters: sanitizedParameters,
     teamId: sourceBoard.teamId,
-    userId: sourceBoard.teamId ? undefined : sourceBoard.userId ?? auth.user.id,
+    userId: sourceBoard.teamId ? undefined : (sourceBoard.userId ?? auth.user.id),
   });
 
   return json(result);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
+import { setTeamTwoFactorRequired } from '@/queries/drizzle/twoFactor';
 import { parseRequest } from '@/lib/request';
 import { json, notFound, serviceUnavailable, unauthorized } from '@/lib/response';
 import { getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
@@ -29,10 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tea
     return serviceUnavailable(getTwoFactorConfigurationError());
   }
 
-  await prisma.client.team.update({
-    where: { id: teamId },
-    data: { twoFactorRequired: required },
-  });
+  await setTeamTwoFactorRequired(teamId, required);
 
   return json({ ok: true, teamId, twoFactorRequired: required });
 }

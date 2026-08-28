@@ -10,7 +10,7 @@ import {
   canViewBoardEntities,
   hasValidBoardReports,
 } from '@/permissions';
-import { createBoard, getUserBoards } from '@/queries/prisma';
+import { createBoard, getUserBoards } from '@/queries/drizzle';
 
 export async function GET(request: Request) {
   const schema = z.object({

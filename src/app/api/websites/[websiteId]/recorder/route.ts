@@ -1,7 +1,7 @@
 import { corsPreflight, getApiCorsHeaders, withCorsHeaders } from '@/lib/cors';
 import { getRecorderConfig } from '@/lib/recorder';
 import { parseRequest } from '@/lib/request';
-import { getWebsite } from '@/queries/prisma';
+import { getWebsite } from '@/queries/drizzle';
 
 export function OPTIONS() {
   return corsPreflight();

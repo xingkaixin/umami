@@ -6,11 +6,10 @@ import {
   SHARE_TOKEN_HEADER,
   SHARE_TOKEN_TYPE,
 } from '@/lib/constants';
-import { createAuthKey, hash, secret } from '@/lib/crypto';
-import { createSecureToken, parseSecureToken, parseToken } from '@/lib/jwt';
-import redis from '@/lib/redis';
+import { hash, secret } from '@/lib/crypto';
+import { parseSecureToken, parseToken } from '@/lib/jwt';
 import { ensureArray } from '@/lib/utils';
-import { getUser } from '@/queries/prisma/user';
+import { getUser } from '@/queries/drizzle/user';
 
 const log = debug('umami:auth');
 
@@ -26,9 +25,9 @@ export async function checkAuth(request: Request) {
   const shareToken = await parseShareToken(request);
 
   let user = null;
-  const { userId, authKey } = payload || {};
+  const { userId } = payload || {};
 
-  if (userId) {
+  if (userId && !payload.type) {
     user = await getUser(userId, { includePassword: true });
 
     // Reject tokens issued before the current password.
@@ -36,23 +35,11 @@ export async function checkAuth(request: Request) {
     if (user && payload.pwd && hash(user.password) !== payload.pwd) {
       user = null;
     }
-  } else if (redis.enabled && authKey) {
-    const key = await redis.client.get(authKey);
-
-    if (key?.userId) {
-      user = await getUser(key.userId, { includePassword: true });
-
-      // Only enforce password-change invalidation for sessions that include a password fingerprint.
-      if (user && key.pwd && hash(user.password) !== key.pwd) {
-        user = null;
-      }
-    }
   }
 
   log({
     hasToken: !!token,
     hasPayload: !!payload,
-    hasAuthKey: !!authKey,
     hasShareToken: !!shareToken,
     userId: user?.id,
   });
@@ -77,24 +64,9 @@ export async function checkAuth(request: Request) {
 
   return {
     token,
-    authKey,
     shareToken,
     user,
   };
-}
-
-export async function saveAuth(data: any, expire = 0) {
-  const authKey = `auth:${createAuthKey()}`;
-
-  if (redis.enabled) {
-    await redis.client.set(authKey, data);
-
-    if (expire) {
-      await redis.client.expire(authKey, expire);
-    }
-  }
-
-  return createSecureToken({ authKey }, secret());
 }
 
 export async function hasPermission(role: string, permission: string | string[]) {

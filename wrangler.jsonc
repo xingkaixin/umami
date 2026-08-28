@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "umami",
+  "account_id": "99e4ea6d8ee7b6cd8ef5577b13cc1c39",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-08-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "umami.xingkaixin.me", "custom_domain": true }],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist/client",
+    "not_found_handling": "none"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "umami",
+      "database_id": "dee22116-3720-47a1-9042-185750498e79",
+      "migrations_dir": "db/d1"
+    }
+  ],
+  "observability": { "enabled": true }
+}

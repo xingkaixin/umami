@@ -1,9 +1,5 @@
 import { gunzipSync } from 'node:zlib';
-import clickhouse from '@/lib/clickhouse';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import prisma from '@/lib/prisma';
-
-const FUNCTION_NAME = 'getReplayChunks';
+import { rawQuery } from '@/db/query';
 
 export interface ReplayChunk {
   sessionId: string;
@@ -23,20 +19,8 @@ interface GetReplayChunksOptions {
 export async function getReplayChunks(
   websiteId: string,
   visitId: string,
-  options: GetReplayChunksOptions = {},
+  { endAt, endChunkIndex }: GetReplayChunksOptions = {},
 ): Promise<ReplayChunk[]> {
-  return runQuery({
-    [PRISMA]: () => relationalQuery(websiteId, visitId, options),
-    [CLICKHOUSE]: () => clickhouseQuery(websiteId, visitId, options),
-  });
-}
-
-async function relationalQuery(
-  websiteId: string,
-  visitId: string,
-  { endAt, endChunkIndex }: GetReplayChunksOptions,
-): Promise<ReplayChunk[]> {
-  const { rawQuery } = prisma;
   const endAtFilter = endAt
     ? `
       and started_at <= {{endAt}}
@@ -68,78 +52,17 @@ async function relationalQuery(
       started_at as "startedAt",
       ended_at as "endedAt"
     from session_replay
-    where website_id = {{websiteId::uuid}}
-      and visit_id = {{visitId::uuid}}
+    where website_id = {{websiteId}}
+      and visit_id = {{visitId}}
       ${endAtFilter}
       ${endChunkFilter}
     order by chunk_index asc
     `,
     { websiteId, visitId, endAt, endChunkIndex },
-    FUNCTION_NAME,
   );
 
   return chunks.map(chunk => ({
     ...chunk,
     events: JSON.parse(gunzipSync(Buffer.from(chunk.events)).toString('utf-8')),
-  }));
-}
-
-async function clickhouseQuery(
-  websiteId: string,
-  visitId: string,
-  { endAt, endChunkIndex }: GetReplayChunksOptions,
-): Promise<ReplayChunk[]> {
-  const { rawQuery } = clickhouse;
-  const endAtFilter = endAt
-    ? `
-      and started_at <= {endAt:DateTime64}
-    `
-    : '';
-  const endChunkFilter =
-    endChunkIndex !== undefined
-      ? `
-      and chunk_index <= {endChunkIndex:UInt32}
-    `
-      : '';
-
-  const results = await rawQuery<
-    {
-      sessionId: string;
-      visitId: string;
-      events: string;
-      chunk_index: number;
-      event_count: number;
-      started_at: string;
-      ended_at: string;
-    }[]
-  >(
-    `
-    select
-      session_id as sessionId,
-      visit_id as visitId,
-      events,
-      chunk_index,
-      event_count,
-      started_at,
-      ended_at
-    from session_replay
-    prewhere website_id = {websiteId:UUID}
-      and visit_id = {visitId:UUID}
-      ${endAtFilter}
-      ${endChunkFilter}
-    order by chunk_index asc
-    `,
-    { websiteId, visitId, endAt, endChunkIndex },
-    FUNCTION_NAME,
-  );
-
-  return results.map(row => ({
-    sessionId: row.sessionId,
-    visitId: row.visitId,
-    events: JSON.parse(row.events),
-    chunkIndex: row.chunk_index,
-    eventCount: row.event_count,
-    startedAt: new Date(row.started_at),
-    endedAt: new Date(row.ended_at),
   }));
 }

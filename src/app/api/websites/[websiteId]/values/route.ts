@@ -3,7 +3,7 @@ import { getQueryFilters, parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
 import { fieldsParam, searchParams, withDateRange } from '@/lib/schema';
 import { canViewWebsiteSection } from '@/permissions';
-import { getWebsiteSegments } from '@/queries/prisma';
+import { getWebsiteSegments } from '@/queries/drizzle';
 import { getValues } from '@/queries/sql';
 
 export async function GET(

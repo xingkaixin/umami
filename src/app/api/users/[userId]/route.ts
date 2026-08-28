@@ -4,7 +4,7 @@ import { parseRequest } from '@/lib/request';
 import { badRequest, json, notFound, ok, unauthorized } from '@/lib/response';
 import { userRoleParam } from '@/lib/schema';
 import { canDeleteUser, canUpdateUser, canViewUser } from '@/permissions';
-import { deleteUser, getUser, getUserByUsername, updateUser } from '@/queries/prisma';
+import { deleteUser, getUser, getUserByUsername, updateUser } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const { auth, error } = await parseRequest(request);

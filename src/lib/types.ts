@@ -1,5 +1,5 @@
 import type { UseQueryOptions } from '@tanstack/react-query';
-import type { Board as PrismaBoard } from '@/generated/prisma/client';
+import type { Board as DatabaseBoard } from '@/db/schema';
 import type { DATA_TYPE, OPERATORS, ROLES } from './constants';
 import type { TIME_UNIT } from './date';
 
@@ -244,7 +244,7 @@ export interface BoardParameters {
   rows?: BoardRow[];
 }
 
-export interface Board extends Omit<PrismaBoard, 'parameters'> {
+export interface Board extends Omit<DatabaseBoard, 'parameters'> {
   parameters: BoardParameters;
 }
 

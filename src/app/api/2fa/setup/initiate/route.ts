@@ -10,8 +10,8 @@ import {
   generateQrCodeDataUrl,
   generateTotpSecret,
 } from '@/lib/two-factor/totp';
-import prisma from '@/lib/prisma';
-import { getUser } from '@/queries/prisma/user';
+import { getTwoFactorAuth, savePendingTwoFactor } from '@/queries/drizzle/twoFactor';
+import { getUser } from '@/queries/drizzle/user';
 
 export async function POST(request: Request) {
   if (process.env.CLOUD_MODE) {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     return badRequest({ message: 'User not found' });
   }
 
-  const existing = await prisma.client.twoFactorAuth.findUnique({ where: { userId } });
+  const existing = await getTwoFactorAuth(userId);
 
   if (existing?.isEnabled) {
     return badRequest({
@@ -50,11 +50,12 @@ export async function POST(request: Request) {
   const otpAuthUri = generateOtpAuthUri(secret, user.username);
   const qrCodeDataUrl = await generateQrCodeDataUrl(otpAuthUri);
 
-  await prisma.client.twoFactorAuth.upsert({
-    where: { userId },
-    update: { secret: encryptedSecret, isEnabled: false },
-    create: { userId, secret: encryptedSecret, isEnabled: false },
-  });
+  if (!(await savePendingTwoFactor(userId, encryptedSecret))) {
+    return badRequest({
+      code: 'two-factor-error-already-enabled',
+      message: '2FA is already enabled',
+    });
+  }
 
   /*
   `manualKey` is intentionally plaintext as the user needs it once for manual entry.

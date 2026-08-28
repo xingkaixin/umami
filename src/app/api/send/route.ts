@@ -1,7 +1,6 @@
 import { startOfHour } from 'date-fns';
 import { isbot } from 'isbot';
 import { z } from 'zod';
-import clickhouse from '@/lib/clickhouse';
 import { CACHE_TOKEN_TYPE, COLLECTION_TYPE, EVENT_TYPE } from '@/lib/constants';
 import { getSalt, hash, secret, uuid } from '@/lib/crypto';
 import { getClientInfo, hasBlockedIp } from '@/lib/detect';
@@ -11,7 +10,13 @@ import { parseRequest } from '@/lib/request';
 import { badRequest, forbidden, json, serverError } from '@/lib/response';
 import { anyObjectParam, urlOrPathParam } from '@/lib/schema';
 import { safeDecodeURI, safeDecodeURIComponent } from '@/lib/url';
-import { createSession, saveEvent, saveSessionData, saveSessionLink, updateSession } from '@/queries/sql';
+import {
+  createSession,
+  saveEvent,
+  saveSessionData,
+  saveSessionLink,
+  updateSession,
+} from '@/queries/sql';
 
 interface Cache {
   websiteId: string;
@@ -157,10 +162,10 @@ export async function POST(request: Request) {
 
     const sessionId = uuid(sourceId, ip, userAgent, sessionSalt);
     const sessionDrift = !!websiteId && !!cache?.sessionId && cache.sessionId !== sessionId;
-    const shouldEnsureSession = !clickhouse.enabled && sessionDrift;
+    const shouldEnsureSession = sessionDrift;
 
     // Create a session if not found
-    if ((!clickhouse.enabled && !cache?.sessionId) || shouldEnsureSession) {
+    if (!cache?.sessionId || shouldEnsureSession) {
       await createSession({
         id: sessionId,
         websiteId: sourceId,

@@ -1,23 +1,15 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { BOARD_TYPES } from '@/lib/boards';
-import { getReport } from '@/queries/prisma';
-import {
-  canViewBoardEntities,
-  hasValidBoardReports,
-  stripInvalidBoardReports,
-} from './board';
+import { getReport } from '@/queries/drizzle';
+import { canViewBoardEntities, hasValidBoardReports, stripInvalidBoardReports } from './board';
 import { canViewLink } from './link';
 import { canViewPixel } from './pixel';
 import { canViewWebsite } from './website';
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getBoard: vi.fn(),
   getReport: vi.fn(),
   getTeamUser: vi.fn(),
-}));
-
-vi.mock('@/lib/prisma', () => ({
-  default: {},
 }));
 
 vi.mock('./website', () => ({

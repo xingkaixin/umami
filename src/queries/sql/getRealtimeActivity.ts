@@ -1,21 +1,10 @@
-import clickhouse from '@/lib/clickhouse';
+import { parseFilters } from '@/db/filters';
+import { rawQuery } from '@/db/query';
 import { EVENT_TYPE } from '@/lib/constants';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
 
-const FUNCTION_NAME = 'getRealtimeActivity';
-
-export async function getRealtimeActivity(...args: [websiteId: string, filters: QueryFilters]) {
-  return runQuery({
-    [PRISMA]: () => relationalQuery(...args),
-    [CLICKHOUSE]: () => clickhouseQuery(...args),
-  });
-}
-
-async function relationalQuery(websiteId: string, filters: QueryFilters) {
-  const { rawQuery, parseFilters } = prisma;
-  const { queryParams, filterQuery, cohortQuery, dateQuery } = parseFilters({
+export async function getRealtimeActivity(websiteId: string, filters: QueryFilters) {
+  const { queryParams, filterQuery, cohortQuery, dateQuery } = await parseFilters({
     ...filters,
     websiteId,
   });
@@ -38,7 +27,7 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
     inner join session
       on session.session_id = website_event.session_id
         and session.website_id = website_event.website_id
-    where website_event.website_id = {{websiteId::uuid}}
+    where website_event.website_id = {{websiteId}}
       and website_event.event_type != ${EVENT_TYPE.performance}
     ${filterQuery}
     ${dateQuery}
@@ -46,40 +35,5 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
     limit 100
     `,
     queryParams,
-    FUNCTION_NAME,
-  );
-}
-
-async function clickhouseQuery(websiteId: string, filters: QueryFilters): Promise<{ x: number }> {
-  const { rawQuery, parseFilters } = clickhouse;
-  const { queryParams, filterQuery, cohortQuery, dateQuery } = parseFilters({
-    ...filters,
-    websiteId,
-  });
-
-  return rawQuery(
-    `
-        select
-            session_id as sessionId,
-            event_name as eventName,
-            created_at as createdAt,
-            browser,
-            os,
-            device,
-            country,
-            url_path as urlPath,
-            referrer_domain as referrerDomain,
-            hostname
-        from website_event
-        ${cohortQuery}
-        where website_id = {websiteId:UUID}
-          and event_type != ${EVENT_TYPE.performance}
-        ${filterQuery}
-        ${dateQuery}
-        order by createdAt desc
-        limit 100
-    `,
-    queryParams,
-    FUNCTION_NAME,
   );
 }

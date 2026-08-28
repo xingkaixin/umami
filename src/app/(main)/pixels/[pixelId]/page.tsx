@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getPixel } from '@/queries/prisma';
+import { getPixel } from '@/queries/drizzle';
 import { PixelPage } from './PixelPage';
 
 export default async function ({ params }: { params: { pixelId: string } }) {

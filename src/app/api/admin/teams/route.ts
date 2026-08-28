@@ -3,7 +3,7 @@ import { parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { pagingParams, searchParams, sortingParams } from '@/lib/schema';
 import { canViewAllTeams } from '@/permissions';
-import { getTeams } from '@/queries/prisma/team';
+import { getTeams } from '@/queries/drizzle/team';
 
 export async function GET(request: Request) {
   const schema = z.object({
@@ -22,38 +22,7 @@ export async function GET(request: Request) {
     return unauthorized();
   }
 
-  const teams = await getTeams(
-    {
-      include: {
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            websites: {
-              where: { deletedAt: null },
-            },
-            members: {
-              where: {
-                user: { deletedAt: null },
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    },
-    query,
-  );
+  const teams = await getTeams(query);
 
   return json(teams);
 }

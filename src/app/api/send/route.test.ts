@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 process.env.APP_SECRET = 'route-send-test-secret';
 
 import { isbot } from 'isbot';
-import clickhouse from '@/lib/clickhouse';
 import { CACHE_TOKEN_TYPE, EVENT_TYPE } from '@/lib/constants';
 import { getSalt, secret, uuid } from '@/lib/crypto';
 import { getClientInfo, hasBlockedIp } from '@/lib/detect';
@@ -20,8 +19,6 @@ import {
   updateSession,
 } from '@/queries/sql';
 import { POST } from './route';
-
-vi.mock('@/lib/clickhouse', () => ({ default: { enabled: false } }));
 
 vi.mock('@/lib/detect', () => ({
   getClientInfo: vi.fn(),
@@ -102,7 +99,6 @@ function makeComputedSessionId(sourceId: string, timestamp = Math.floor(Date.now
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (clickhouse as any).enabled = false;
   delete process.env.DISABLE_BOT_CHECK;
   delete process.env.REMOVE_TRAILING_SLASH;
   delete process.env.SALT_ROTATION;
@@ -297,25 +293,13 @@ describe('website lookup', () => {
   });
 });
 
-describe('session creation', () => {
-  test('creates a session when clickhouse is disabled and there is no cache', async () => {
-    await callPOST({ type: 'event', payload: { website: WEBSITE_ID, url: '/' } });
-
-    expect(createSessionMock).toHaveBeenCalledTimes(1);
-    expect(createSessionMock.mock.calls[0][0]).toMatchObject({
-      websiteId: WEBSITE_ID,
-      browser: 'chrome',
-      os: 'Windows 10',
-      device: 'desktop',
-    });
-  });
-
-  test('does not create a session when clickhouse is enabled', async () => {
-    (clickhouse as any).enabled = true;
-
-    await callPOST({ type: 'event', payload: { website: WEBSITE_ID, url: '/' } });
-
-    expect(createSessionMock).not.toHaveBeenCalled();
+test('creates a D1 session when there is no cache token', async () => {
+  await callPOST({ type: 'event', payload: { website: WEBSITE_ID, url: '/' } });
+  expect(createSessionMock).toHaveBeenCalledTimes(1);
+  expect(createSessionMock.mock.calls[0][0]).toMatchObject({
+    websiteId: WEBSITE_ID,
+    browser: 'chrome',
+    device: 'desktop',
   });
 });
 
@@ -602,24 +586,6 @@ describe('cache token handling', () => {
     expect(savedSessionData.sessionId).toBe(createdSession.id);
     expect(body.sessionId).toBe(createdSession.id);
     expect(body.visitId).not.toBe('cached-visit');
-  });
-
-  test('a drifted cache token resets the visit in clickhouse mode without creating a session row', async () => {
-    (clickhouse as any).enabled = true;
-    const token = makeCacheToken({ sessionId: 'cached-session' });
-
-    const response = await callPOST(
-      { type: 'event', payload: { website: WEBSITE_ID, url: '/' } },
-      { headers: { 'x-umami-cache': token } },
-    );
-
-    const savedEvent = saveEventMock.mock.calls[0][0] as Record<string, any>;
-    const body = (await response.json()) as Record<string, any>;
-
-    expect(createSessionMock).not.toHaveBeenCalled();
-    expect(savedEvent.sessionId).toBe(body.sessionId);
-    expect(savedEvent.visitId).not.toBe('cached-visit');
-    expect(body.visitId).toBe(savedEvent.visitId);
   });
 
   test('an invalid cache token falls back to website lookup', async () => {

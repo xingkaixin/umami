@@ -2,7 +2,7 @@
 import { Loading } from '@umami/react-zen';
 import { createContext, type ReactNode } from 'react';
 import { usePixelQuery } from '@/components/hooks/queries/usePixelQuery';
-import type { Pixel } from '@/generated/prisma/client';
+import type { Pixel } from '@/db/schema';
 
 export const PixelContext = createContext<Pixel>(null);
 

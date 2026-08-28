@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { getTeamUser } from '@/queries/prisma';
+import { getTeamUser } from '@/queries/drizzle';
 import {
   canCreateTeam,
   canCreateTeamWebsite,
@@ -11,7 +11,7 @@ import {
   canViewTeam,
 } from './team';
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getTeamUser: vi.fn(),
 }));
 

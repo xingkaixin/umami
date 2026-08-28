@@ -4,7 +4,7 @@ import { parseRequest } from '@/lib/request';
 import { badRequest, json, ok, unauthorized } from '@/lib/response';
 import { teamRoleParam } from '@/lib/schema';
 import { canDeleteTeamUser, canUpdateTeam } from '@/permissions';
-import { deleteTeamUser, getTeamUser, updateTeamUser } from '@/queries/prisma';
+import { deleteTeamUser, getTeamUser, updateTeamUser } from '@/queries/drizzle';
 
 export async function GET(
   request: Request,

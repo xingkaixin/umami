@@ -1,13 +1,21 @@
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
+import { checkPassword } from '@/lib/password';
 import { parseRequest } from '@/lib/request';
 import { badRequest, forbidden, json, notFound, serviceUnavailable } from '@/lib/response';
-import { decryptSecret, getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
-import { checkRateLimit, recordFailedAttempt, resetRateLimit } from '@/lib/two-factor/rate-limit';
-import { isOtpReplayed, markOtpUsed } from '@/lib/two-factor/replay-prevention';
+import {
+  decryptSecret,
+  getTwoFactorConfigurationError,
+  isTwoFactorConfigured,
+} from '@/lib/two-factor/crypto';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/two-factor/rate-limit';
+import { isOtpReplayed } from '@/queries/drizzle/twoFactor';
 import { verifyTotp } from '@/lib/two-factor/totp';
-import { checkPassword } from '@/lib/password';
-import { getUser } from '@/queries/prisma/user';
+import {
+  disableTwoFactorAuth,
+  getTwoFactorAuth,
+  getTwoFactorRequirements,
+} from '@/queries/drizzle/twoFactor';
+import { getUser } from '@/queries/drizzle/user';
 
 export async function POST(request: Request) {
   if (process.env.CLOUD_MODE) {
@@ -32,31 +40,10 @@ export async function POST(request: Request) {
   const userId = auth.user.id;
   const { password, token } = body;
 
-  // Globally required
-  const globalSetting = await prisma.client.appSetting.findUnique({
-    where: { key: 'twoFactorRequiredGlobal' },
-  });
-  const isGlobalRequired = globalSetting?.value === 'true';
-
-  // Required for this user
-  const userRecord = await prisma.client.user.findUnique({
-    where: { id: userId },
-    select: { twoFactorRequired: true },
-  });
-  const isUserRequired = userRecord?.twoFactorRequired ?? false;
-
-  // Required for this user's teams
-  const userTeams = await prisma.client.teamUser.findMany({ where: { userId } });
-  const teamIds = userTeams.map(t => t.teamId);
-  const teamsWithRequirement = teamIds.length
-    ? await prisma.client.team.findMany({
-        where: { id: { in: teamIds }, twoFactorRequired: true },
-      })
-    : [];
-  const isTeamRequired = teamsWithRequirement.length > 0;
+  const requirements = await getTwoFactorRequirements(userId);
 
   // Cannot disable 2FA if required
-  if (isGlobalRequired || isUserRequired || isTeamRequired) {
+  if (requirements.global || requirements.user || requirements.team) {
     return forbidden({
       code: 'two-factor-error-disable-not-allowed',
       message: '2FA is required and cannot be disabled',
@@ -73,7 +60,7 @@ export async function POST(request: Request) {
   }
 
   // Verify if 2FA is enabled
-  const twoFactor = await prisma.client.twoFactorAuth.findUnique({ where: { userId } });
+  const twoFactor = await getTwoFactorAuth(userId);
   if (!twoFactor?.isEnabled) {
     return badRequest({ code: 'two-factor-error-not-enabled', message: '2FA is not enabled' });
   }
@@ -109,12 +96,9 @@ export async function POST(request: Request) {
     });
   }
 
-  await prisma.transaction(async tx => {
-    await markOtpUsed(userId, token, tx);
-    await tx.twoFactorAuth.delete({ where: { userId } });
-    await tx.twoFactorBackupCode.deleteMany({ where: { userId } });
-  });
-  await resetRateLimit(userId);
+  if (!(await disableTwoFactorAuth(userId, token, twoFactor.secret))) {
+    return badRequest({ code: 'two-factor-error-code-used', message: 'Code already used' });
+  }
 
   return json({ ok: true });
 }

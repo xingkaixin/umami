@@ -1,5 +1,5 @@
-import type { Board, Link, Pixel, Website } from '@/generated/prisma/client';
-import { getBoard, getLink, getPixel, getWebsite } from '@/queries/prisma';
+import type { Board, Link, Pixel, Website } from '@/db/schema';
+import { getBoard, getLink, getPixel, getWebsite } from '@/queries/drizzle';
 
 export async function getEntity(entityId: string): Promise<Website | Link | Pixel | Board | null> {
   const [website, link, pixel, board] = await Promise.all([

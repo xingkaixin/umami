@@ -1,74 +1,33 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { DATA_TYPE } from '@/lib/constants';
-import { relationalQuery } from './saveSessionData';
+import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
+import { getDatabase } from '@/db/client';
+import { sessionData } from '@/db/schema';
+import { createTestDatabase, resetTestDatabase } from '@/test/database';
+import { saveSessionData } from './saveSessionData';
 
-const { writeRawQueryMock } = vi.hoisted(() => ({
-  writeRawQueryMock: vi.fn(),
-}));
+let worker: Awaited<ReturnType<typeof createTestDatabase>>;
+beforeAll(async () => {
+  worker = await createTestDatabase();
+}, 30_000);
+beforeEach(resetTestDatabase);
+afterAll(() => worker?.dispose());
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    writeRawQuery: writeRawQueryMock,
-  },
-}));
+test('upserts one property per session and applies explicit timestamps', async () => {
+  const args = { websiteId: 'website-1', sessionId: 'session-1', distinctId: 'distinct-1' };
+  await saveSessionData({ ...args, sessionData: { plan: 'trial' } });
+  const createdAt = new Date('2026-07-30T10:00:00Z');
+  await saveSessionData({ ...args, sessionData: { plan: 'pro' }, createdAt });
+  expect(await getDatabase().select().from(sessionData)).toEqual([
+    expect.objectContaining({ ...args, dataKey: 'plan', stringValue: 'pro', createdAt }),
+  ]);
+});
 
-describe('relationalQuery', () => {
-  beforeEach(() => {
-    writeRawQueryMock.mockReset();
-    writeRawQueryMock.mockResolvedValue(undefined);
-  });
-
-  test('writes session data with a Postgres upsert keyed by sessionId and dataKey', async () => {
-    const createdAt = new Date('2026-07-30T10:00:00.000Z');
-
-    await relationalQuery({
-      websiteId: 'website-1',
-      sessionId: 'session-1',
-      sessionData: { plan: 'pro' },
-      distinctId: 'distinct-1',
-      createdAt,
-    });
-
-    expect(writeRawQueryMock).toHaveBeenCalledTimes(1);
-
-    const [query, params, tag] = writeRawQueryMock.mock.calls[0];
-
-    expect(query).toContain('insert into session_data');
-    expect(query).toContain('on conflict (session_id, data_key)');
-    expect(query).toContain('do update set');
-    expect(query).toContain('coalesce({{createdAt}}, now())');
-    expect(query).toContain('created_at = coalesce({{createdAt}}, session_data.created_at)');
-    expect(query).toContain('{{id}}');
-    expect(query).toContain('{{websiteId}}');
-    expect(query).toContain('{{sessionId}}');
-    expect(query).toContain('{{dataKey}}');
-    expect(params).toEqual({
-      id: expect.any(String),
-      websiteId: 'website-1',
-      sessionId: 'session-1',
-      dataKey: 'plan',
-      stringValue: 'pro',
-      numberValue: null,
-      dateValue: null,
-      dataType: DATA_TYPE.string,
-      distinctId: 'distinct-1',
-      createdAt,
-    });
-    expect(tag).toBe('saveSessionData');
-  });
-
-  test('preserves default and existing createdAt behavior when createdAt is omitted', async () => {
-    await relationalQuery({
-      websiteId: 'website-1',
-      sessionId: 'session-1',
-      sessionData: { plan: 'pro' },
-      distinctId: 'distinct-1',
-    });
-
-    const [query, params] = writeRawQueryMock.mock.calls[0];
-
-    expect(query).toContain('coalesce({{createdAt}}, now())');
-    expect(query).toContain('created_at = coalesce({{createdAt}}, session_data.created_at)');
-    expect(params.createdAt).toBeUndefined();
-  });
+test('defaults the initial timestamp and preserves it on later updates', async () => {
+  const args = { websiteId: 'website-1', sessionId: 'session-1' };
+  const before = Date.now();
+  await saveSessionData({ ...args, sessionData: { plan: 'trial' } });
+  const first = await getDatabase().select().from(sessionData).get();
+  expect(first.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+  await saveSessionData({ ...args, sessionData: { plan: 'pro' } });
+  const next = await getDatabase().select().from(sessionData).get();
+  expect(next).toMatchObject({ id: first.id, createdAt: first.createdAt, stringValue: 'pro' });
 });

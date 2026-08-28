@@ -1,14 +1,17 @@
 import { z } from 'zod';
 import { DOMAIN_REGEX, ENTITY_TYPE } from '@/lib/constants';
 import { uuid } from '@/lib/crypto';
-import { fetchAccount, fetchTeam } from '@/lib/load';
 import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { pagingParams, searchParams, sortingParams } from '@/lib/schema';
-import { getCloudWebsiteLimit } from '@/lib/subscription';
 import { canCreateTeamWebsite, canCreateWebsite } from '@/permissions';
-import { createShare, createWebsite, getTeamWebsiteCount, getWebsiteCount } from '@/queries/prisma';
-import { getAllUserWebsitesIncludingTeamAccess, getUserWebsites } from '@/queries/prisma/website';
+import {
+  createShare,
+  createWebsite,
+  getTeamWebsiteCount,
+  getWebsiteCount,
+} from '@/queries/drizzle';
+import { getAllUserWebsitesIncludingTeamAccess, getUserWebsites } from '@/queries/drizzle/website';
 
 export async function GET(request: Request) {
   const schema = z.object({
@@ -51,21 +54,6 @@ export async function POST(request: Request) {
   }
 
   const { id, name, domain, shareId, teamId } = body;
-
-  if (process.env.CLOUD_MODE) {
-    const account = teamId ? await fetchTeam(teamId) : await fetchAccount(auth.user.id);
-    const websiteLimit = getCloudWebsiteLimit(account);
-
-    if (websiteLimit !== null) {
-      const count = teamId
-        ? await getTeamWebsiteCount(teamId)
-        : await getWebsiteCount(auth.user.id);
-
-      if (count >= websiteLimit) {
-        return unauthorized({ message: 'Website limit reached.' });
-      }
-    }
-  }
 
   if ((teamId && !(await canCreateTeamWebsite(auth, teamId))) || !(await canCreateWebsite(auth))) {
     return unauthorized();

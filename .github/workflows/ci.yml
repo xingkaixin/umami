@@ -1,27 +1,20 @@
-name: Node.js CI
+name: Cloudflare CI
 
-on: [push]
-
-env:
-  DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
-  SKIP_DB_CHECK: 1
+on: [push, pull_request]
 
 jobs:
-  build:
-    if: github.repository == 'umami-software/umami'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-
+  verify:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.15.1
-          run_install: false
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
+          version: 11.24.0
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: "pnpm"
-      - run: pnpm install
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm deploy:check

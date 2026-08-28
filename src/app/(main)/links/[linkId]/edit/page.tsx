@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getLink } from '@/queries/prisma';
+import { getLink } from '@/queries/drizzle';
 import { LinkEditPage } from './LinkEditPage';
 
 export default async function ({ params }: { params: Promise<{ linkId: string }> }) {

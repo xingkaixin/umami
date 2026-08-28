@@ -1,8 +1,7 @@
-import clickhouse from '@/lib/clickhouse';
+import { getDatabase } from '@/db/client';
+import { insertRows } from '@/db/insert';
+import { heatmapEvent } from '@/db/schema';
 import { uuid } from '@/lib/crypto';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import kafka from '@/lib/kafka';
-import prisma from '@/lib/prisma';
 
 export interface HeatmapEventRow {
   websiteId: string;
@@ -38,10 +37,13 @@ export async function saveHeatmapEvents(rows: HeatmapEventRow[]) {
     scrollPct: toScrollPct(r.scrollPct),
   }));
 
-  return runQuery({
-    [PRISMA]: () => relationalQuery(normalizedRows),
-    [CLICKHOUSE]: () => clickhouseQuery(normalizedRows),
-  });
+  const db = getDatabase();
+  const [first, ...rest] = insertRows(
+    db,
+    heatmapEvent,
+    normalizedRows.map(row => ({ id: uuid(), ...row })),
+  );
+  if (first) await db.batch([first, ...rest]);
 }
 
 function toInt(value: number | null) {
@@ -54,57 +56,4 @@ function toScrollPct(value: number | null) {
   }
 
   return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-async function relationalQuery(rows: HeatmapEventRow[]) {
-  return prisma.client.heatmapEvent.createMany({
-    data: rows.map(r => ({
-      id: uuid(),
-      websiteId: r.websiteId,
-      sessionId: r.sessionId,
-      visitId: r.visitId,
-      urlPath: r.urlPath,
-      eventType: r.eventType,
-      x: r.x,
-      y: r.y,
-      pageX: r.pageX,
-      pageY: r.pageY,
-      pageW: r.pageW,
-      viewportW: r.viewportW,
-      viewportH: r.viewportH,
-      pageH: r.pageH,
-      scrollPct: r.scrollPct,
-      createdAt: r.createdAt,
-    })) as any,
-  });
-}
-
-async function clickhouseQuery(rows: HeatmapEventRow[]) {
-  const { insert, getUTCString } = clickhouse;
-  const { sendMessage } = kafka;
-
-  const messages = rows.map(r => ({
-    heatmap_event_id: uuid(),
-    website_id: r.websiteId,
-    session_id: r.sessionId,
-    visit_id: r.visitId,
-    url_path: r.urlPath,
-    event_type: r.eventType,
-    x: r.x,
-    y: r.y,
-    page_x: r.pageX,
-    page_y: r.pageY,
-    page_w: r.pageW,
-    viewport_w: r.viewportW,
-    viewport_h: r.viewportH,
-    page_h: r.pageH,
-    scroll_pct: r.scrollPct,
-    created_at: getUTCString(r.createdAt),
-  }));
-
-  if (kafka.enabled) {
-    return sendMessage('heatmap_event', messages);
-  }
-
-  return insert('heatmap_event', messages);
 }

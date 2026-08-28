@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json } from '@/lib/response';
 import { pagingParams, sortingParams } from '@/lib/schema';
-import { getUserTeams } from '@/queries/prisma';
+import { getUserTeams } from '@/queries/drizzle';
 
 export async function GET(request: Request) {
   const schema = z.object({

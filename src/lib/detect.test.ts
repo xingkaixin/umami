@@ -1,83 +1,46 @@
-import { beforeEach, expect, test, vi } from 'vitest';
-import { getLocation, hasBlockedIp } from './detect';
+import { beforeEach, expect, test } from 'vitest';
+import { getClientInfo, getLocation, hasBlockedIp } from './detect';
 import { getIpAddress } from './ip';
 
-const IP = '127.0.0.1';
-
-const isLocalhost = vi.mocked(await import('is-localhost-ip'));
-
-vi.mock('is-localhost-ip', () => ({
-  default: vi.fn(),
-}));
-
 beforeEach(() => {
-  vi.resetAllMocks();
-
   delete process.env.CLIENT_IP_HEADER;
   delete process.env.IGNORE_IP;
-  delete process.env.SKIP_LOCATION_HEADERS;
 });
 
-test('getIpAddress: Custom header', () => {
-  process.env.CLIENT_IP_HEADER = 'x-custom-ip-header';
-
-  expect(getIpAddress(new Headers({ 'x-custom-ip-header': IP }))).toEqual(IP);
+test('uses the connecting IP and honors an explicitly configured proxy header', () => {
+  expect(
+    getIpAddress(new Headers({ 'cf-connecting-ip': '8.8.8.8', 'x-forwarded-for': '1.1.1.1' })),
+  ).toBe('8.8.8.8');
+  process.env.CLIENT_IP_HEADER = 'x-custom-ip';
+  expect(getIpAddress(new Headers({ 'x-custom-ip': '1.1.1.1' }))).toBe('1.1.1.1');
 });
 
-test('getIpAddress: Custom header set to x-forwarded-for uses leftmost IP in chain', () => {
-  process.env.CLIENT_IP_HEADER = 'x-forwarded-for';
+test.each(['not-an-ip', '127.0.0.1', '192.168.1.1', '::1'])(
+  'does not locate private or invalid address %s',
+  ip => {
+    expect(getLocation(ip, { country: 'US', regionCode: 'CA' })).toBeNull();
+  },
+);
 
-  expect(getIpAddress(new Headers({ 'x-forwarded-for': `${IP}, 10.0.0.1, 10.0.0.2` }))).toEqual(IP);
-});
-
-test('getIpAddress: CloudFlare header', () => {
-  expect(getIpAddress(new Headers({ 'cf-connecting-ip': IP }))).toEqual(IP);
-});
-
-test('getIpAddress: Standard header', () => {
-  expect(getIpAddress(new Headers({ 'x-forwarded-for': IP }))).toEqual(IP);
-});
-
-test('getIpAddress: No header', () => {
-  expect(getIpAddress(new Headers())).toEqual(undefined);
-});
-
-test('getLocation: returns null for malformed ip', async () => {
-  await expect(
-    getLocation(
-      'not-an-ip',
-      new Headers({
-        'cf-ipcountry': 'US',
-        'cf-region-code': 'CA',
-        'cf-ipcity': 'Los Angeles',
-      }),
-      false,
-    ),
-  ).resolves.toEqual(null);
-});
-
-test('getLocation: treats localhost check errors as non-local', async () => {
-  isLocalhost.default.mockRejectedValue(new Error('DNS Lookup failed.'));
-
-  await expect(
-    getLocation(
-      '8.8.8.8',
-      new Headers({
-        'cf-ipcountry': 'US',
-        'cf-region-code': 'CA',
-        'cf-ipcity': 'Los Angeles',
-      }),
-      false,
-    ),
-  ).resolves.toEqual({
+test('reads geographic metadata supplied by the Workers runtime', () => {
+  expect(getLocation('8.8.8.8', { country: 'US', regionCode: 'CA', city: 'Los Angeles' })).toEqual({
     country: 'US',
     region: 'US-CA',
     city: 'Los Angeles',
   });
 });
 
-test('hasBlockedIp: returns false for malformed client ip with cidr block', () => {
-  process.env.IGNORE_IP = '10.0.0.0/8';
+test('does not trust geographic headers or associate an overridden IP with the request location', async () => {
+  const request = new Request('https://example.com', {
+    headers: { 'cf-connecting-ip': '8.8.8.8', 'x-vercel-ip-country': 'CN', 'cf-ipcountry': 'CN' },
+  });
+  expect(await getClientInfo(request, {})).toMatchObject({ country: undefined });
+  Object.defineProperty(request, 'cf', { value: { country: 'US', regionCode: 'CA' } });
+  expect(await getClientInfo(request, {})).toMatchObject({ country: 'US', region: 'US-CA' });
+  expect(await getClientInfo(request, { ip: '1.1.1.1' })).toMatchObject({ country: undefined });
+});
 
+test('ignores malformed blocked addresses', () => {
+  process.env.IGNORE_IP = '10.0.0.0/8';
   expect(hasBlockedIp('not-an-ip')).toBe(false);
 });

@@ -48,7 +48,7 @@ test.describe('SessionModal outside-click dismissal', () => {
 
   test('clicking in the left side margin dismisses the modal', async ({ page }) => {
     const box = await getSheetBox(page);
-    const marginX = 20;
+    const marginX = box.x / 2;
     const midY = box.y + box.height / 2;
     expect(marginX).toBeLessThan(box.x); // genuinely outside the sheet
 
@@ -60,7 +60,7 @@ test.describe('SessionModal outside-click dismissal', () => {
 
   test('clicking in the right side margin dismisses the modal', async ({ page }) => {
     const box = await getSheetBox(page);
-    const marginX = VIEWPORT.width - 20;
+    const marginX = (VIEWPORT.width + box.x + box.width) / 2;
     const midY = box.y + box.height / 2;
     expect(marginX).toBeGreaterThan(box.x + box.width); // genuinely outside the sheet
 

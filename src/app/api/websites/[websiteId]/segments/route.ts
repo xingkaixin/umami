@@ -4,7 +4,7 @@ import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { searchParams, segmentParamSchema, segmentTypeParam } from '@/lib/schema';
 import { canUpdateWebsite, canViewSharedWebsiteFilters } from '@/permissions';
-import { createSegment, getWebsiteSegments } from '@/queries/prisma';
+import { createSegment, getWebsiteSegments } from '@/queries/drizzle';
 
 export async function GET(
   request: Request,

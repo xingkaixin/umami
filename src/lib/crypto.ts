@@ -54,7 +54,8 @@ export function md5(...args: string[]) {
 }
 
 export function secret() {
-  return hash(process.env.APP_SECRET || process.env.DATABASE_URL);
+  if (!process.env.APP_SECRET) throw new Error('APP_SECRET is required.');
+  return hash(process.env.APP_SECRET);
 }
 
 export function uuid(...args: any) {

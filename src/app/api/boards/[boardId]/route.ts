@@ -10,7 +10,7 @@ import {
   canViewBoardEntities,
   hasValidBoardReports,
 } from '@/permissions';
-import { deleteBoard, getBoard, updateBoard } from '@/queries/prisma';
+import { deleteBoard, getBoard, updateBoard } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ boardId: string }> }) {
   const { auth, error } = await parseRequest(request);

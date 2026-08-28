@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { Prisma } from '@/generated/prisma/client';
 import { DOMAIN_REGEX, ENTITY_TYPE } from '@/lib/constants';
 import { uuid } from '@/lib/crypto';
 import { getRecorderConfig, getRecorderEnabled } from '@/lib/recorder';
@@ -13,7 +12,7 @@ import {
   getShareByEntityId,
   getWebsite,
   updateWebsite,
-} from '@/queries/prisma';
+} from '@/queries/drizzle';
 
 export async function GET(
   request: Request,
@@ -91,7 +90,7 @@ export async function POST(
       name,
       domain,
       ...(replayConfig !== undefined && {
-        replayConfig: nextReplayConfig as Prisma.InputJsonObject,
+        replayConfig: nextReplayConfig,
         recorderEnabled: getRecorderEnabled(nextReplayConfig),
       }),
     });

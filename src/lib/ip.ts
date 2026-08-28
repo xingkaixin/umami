@@ -1,20 +1,6 @@
 import ipaddr from 'ipaddr.js';
 
-export const IP_ADDRESS_HEADERS = [
-  ...(process.env.CLOUD_MODE ? ['x-umami-client-ip'] : []), // Umami custom header (cloud mode only)
-  'true-client-ip', // CDN
-  'cf-connecting-ip', // Cloudflare
-  'fastly-client-ip', // Fastly
-  'x-nf-client-connection-ip', // Netlify
-  'do-connecting-ip', // Digital Ocean
-  'x-real-ip', // Reverse proxy
-  'x-appengine-user-ip', // Google App Engine
-  'x-forwarded-for',
-  'forwarded',
-  'x-client-ip',
-  'x-cluster-client-ip',
-  'x-forwarded',
-];
+const IP_ADDRESS_HEADERS = ['cf-connecting-ip'];
 
 function normalizeIp(ip?: string | null) {
   if (!ip) return ip;

@@ -2,7 +2,7 @@ import { parseRequest } from '@/lib/request';
 import { json, notFound, ok, unauthorized } from '@/lib/response';
 import { reportSchema } from '@/lib/schema';
 import { canDeleteReport, canUpdateReport, canViewReport } from '@/permissions';
-import { deleteReport, getReport, updateReport } from '@/queries/prisma';
+import { deleteReport, getReport, updateReport } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ reportId: string }> }) {
   const { auth, error } = await parseRequest(request);

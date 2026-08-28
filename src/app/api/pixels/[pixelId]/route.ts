@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, ok, serverError, unauthorized } from '@/lib/response';
 import { canDeletePixel, canUpdatePixel, canViewPixel } from '@/permissions';
-import { deletePixel, getPixel, updatePixel } from '@/queries/prisma';
+import { deletePixel, getPixel, updatePixel } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ pixelId: string }> }) {
   const { auth, error } = await parseRequest(request);

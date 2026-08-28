@@ -2,45 +2,15 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { POST } from '@/app/api/send/route';
-import type { Link } from '@/generated/prisma/client';
-import redis from '@/lib/redis';
 import { notFound } from '@/lib/response';
-import { findLink } from '@/queries/prisma';
+import { getLinkBySlug } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  let link: Link;
+  const link = await getLinkBySlug(slug);
 
-  if (redis.enabled) {
-    link = await redis.client.fetch(
-      `link:${slug}`,
-      async () => {
-        return findLink({
-          where: {
-            slug,
-            deletedAt: null,
-          },
-        });
-      },
-      86400,
-    );
-
-    if (!link) {
-      return notFound();
-    }
-  } else {
-    link = await findLink({
-      where: {
-        slug,
-        deletedAt: null,
-      },
-    });
-
-    if (!link) {
-      return notFound();
-    }
-  }
+  if (!link) return notFound();
 
   const payload = {
     type: 'event',

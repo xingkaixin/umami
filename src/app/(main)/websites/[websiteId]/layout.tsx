@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { WebsiteLayout } from '@/app/(main)/websites/[websiteId]/WebsiteLayout';
-import { getWebsite } from '@/queries/prisma';
+import { getWebsite } from '@/queries/drizzle';
 
 export default async function ({
   children,

@@ -1,42 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { getFunnel } from './getFunnel';
 
-const {
-  state,
-  prismaRawQuery,
-  prismaParseFilters,
-  getAddIntervalQuery,
-  clickhouseRawQuery,
-  clickhouseParseFilters,
-} = vi.hoisted(() => ({
-  state: { mode: 'prisma' as 'prisma' | 'clickhouse' },
-  prismaRawQuery: vi.fn(),
-  prismaParseFilters: vi.fn(),
+const { rawQueryMock, parseFiltersMock, getAddIntervalQuery } = vi.hoisted(() => ({
+  rawQueryMock: vi.fn(),
+  parseFiltersMock: vi.fn(),
   getAddIntervalQuery: vi.fn(),
-  clickhouseRawQuery: vi.fn(),
-  clickhouseParseFilters: vi.fn(),
 }));
-
-vi.mock('@/lib/db', () => ({
-  CLICKHOUSE: 'clickhouse',
-  PRISMA: 'prisma',
-  runQuery: vi.fn((queries: Record<string, () => unknown>) => queries[state.mode]()),
-}));
-
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    rawQuery: prismaRawQuery,
-    parseFilters: prismaParseFilters,
-    getAddIntervalQuery,
-  },
-}));
-
-vi.mock('@/lib/clickhouse', () => ({
-  default: {
-    rawQuery: clickhouseRawQuery,
-    parseFilters: clickhouseParseFilters,
-  },
-}));
+vi.mock('@/db/query', () => ({ rawQuery: rawQueryMock }));
+vi.mock('@/db/filters', () => ({ parseFilters: parseFiltersMock }));
+vi.mock('@/db/dates', () => ({ getAddIntervalQuery }));
 
 const parseFiltersResult = {
   queryParams: { websiteId: 'website-1' },
@@ -56,27 +28,22 @@ const baseParameters = {
 };
 
 beforeEach(() => {
-  state.mode = 'prisma';
-  prismaRawQuery.mockReset();
-  prismaParseFilters.mockReset();
+  rawQueryMock.mockReset();
+  parseFiltersMock.mockReset();
   getAddIntervalQuery.mockReset();
-  clickhouseRawQuery.mockReset();
-  clickhouseParseFilters.mockReset();
 
-  prismaParseFilters.mockReturnValue(parseFiltersResult);
-  clickhouseParseFilters.mockReturnValue(parseFiltersResult);
+  parseFiltersMock.mockReturnValue(parseFiltersResult);
   getAddIntervalQuery.mockReturnValue('add_interval(l.created_at, 30 minute)');
   // formatResults reads results[0].count etc, so provide numeric counts
-  prismaRawQuery.mockResolvedValue([{ count: 100 }, { count: 40 }]);
-  clickhouseRawQuery.mockResolvedValue([{ count: 100 }, { count: 40 }]);
+  rawQueryMock.mockResolvedValue([{ count: 100 }, { count: 40 }]);
 });
 
-describe('getFunnel postgres branch', () => {
+describe('getFunnel D1 query', () => {
   test('builds level CTEs and a UNION sum query, one per step', async () => {
     await getFunnel('website-1', baseParameters, {});
 
-    expect(prismaRawQuery).toHaveBeenCalledTimes(1);
-    const [query, params] = prismaRawQuery.mock.calls[0];
+    expect(rawQueryMock).toHaveBeenCalledTimes(1);
+    const [query, params] = rawQueryMock.mock.calls[0];
 
     expect(query).toContain('WITH level1 AS');
     expect(query).toContain(', level2 AS');
@@ -109,13 +76,13 @@ describe('getFunnel postgres branch', () => {
       {},
     );
 
-    const [query, params] = prismaRawQuery.mock.calls[0];
+    const [query, params] = rawQueryMock.mock.calls[0];
     expect(query).toContain('and url_path like {{0}}');
     expect(query).toContain('and we.url_path like {{1}}');
     expect(params).toMatchObject({ 0: '/blog/%', 1: '%/thanks' });
   });
 
-  test('event steps with contains filter emit exists() subqueries and ilike params', async () => {
+  test('event steps with contains filter emit exists() subqueries and like params', async () => {
     await getFunnel(
       'website-1',
       {
@@ -132,12 +99,12 @@ describe('getFunnel postgres branch', () => {
       {},
     );
 
-    const [query, params] = prismaRawQuery.mock.calls[0];
+    const [query, params] = rawQueryMock.mock.calls[0];
     expect(query).toContain('and event_name = {{0}}');
     expect(query).toContain('and exists (');
     expect(query).toContain('_ed0_0.data_key = {{f_0_0_k}}');
-    expect(query).toContain('ilike {{f_0_0_v}}');
-    // contains -> ilike operator, value wrapped in % ... %
+    expect(query).toContain('like {{f_0_0_v}}');
+    // contains -> like operator, value wrapped in % ... %
     expect(params).toMatchObject({ f_0_0_k: 'plan', f_0_0_v: '%pro%' });
   });
 
@@ -162,20 +129,20 @@ describe('getFunnel postgres branch', () => {
       {},
     );
 
-    const [query, params] = prismaRawQuery.mock.calls[0];
+    const [query, params] = rawQueryMock.mock.calls[0];
     // eq -> '=' with raw value
     expect(query).toContain('= {{f_0_0_v}}');
     expect(params).toMatchObject({ f_0_0_v: 'x' });
     // neq -> '!=' with raw value
     expect(query).toContain('!= {{f_0_1_v}}');
     expect(params).toMatchObject({ f_0_1_v: 'y' });
-    // dnc -> 'not ilike' with wrapped value
-    expect(query).toContain('not ilike {{f_0_2_v}}');
+    // dnc -> 'not like' with wrapped value
+    expect(query).toContain('not like {{f_0_2_v}}');
     expect(params).toMatchObject({ f_0_2_v: '%z%' });
   });
 
   test('formatResults computes dropoff / remaining relative to first step', async () => {
-    prismaRawQuery.mockResolvedValue([{ count: 100 }, { count: 40 }]);
+    rawQueryMock.mockResolvedValue([{ count: 100 }, { count: 40 }]);
 
     const result = await getFunnel('website-1', baseParameters, {});
 
@@ -187,74 +154,5 @@ describe('getFunnel postgres branch', () => {
       remaining: 0.4,
     });
     expect(result[1].dropoff).toBeCloseTo(0.6);
-  });
-});
-
-describe('getFunnel clickhouse branch', () => {
-  beforeEach(() => {
-    state.mode = 'clickhouse';
-  });
-
-  test('builds level0 base CTE, step filter predicate and UNION ALL sum query', async () => {
-    await getFunnel('website-1', baseParameters, {});
-
-    expect(clickhouseRawQuery).toHaveBeenCalledTimes(1);
-    expect(prismaRawQuery).not.toHaveBeenCalled();
-    const [query, params] = clickhouseRawQuery.mock.calls[0];
-
-    expect(query).toContain('WITH level0 AS');
-    expect(query).toContain('level1 AS');
-    expect(query).toContain(', level2 AS');
-    expect(query).toContain('union all ');
-    expect(query).toContain('and website_id = {websiteId:UUID}');
-    // step filter predicate uses param0/param1
-    expect(query).toContain('url_path = {param0:String}');
-    expect(query).toContain('y.url_path = {param1:String}');
-    // window interval expressed inline
-    expect(query).toContain('x.created_at + interval 30 minute');
-    expect(params).toMatchObject({ param0: '/home', param1: '/checkout', websiteId: 'website-1' });
-  });
-
-  test('wildcard values switch to LIKE with % substitution', async () => {
-    await getFunnel(
-      'website-1',
-      {
-        ...baseParameters,
-        steps: [
-          { type: 'path', value: '/a/*' },
-          { type: 'path', value: '/b' },
-        ],
-      },
-      {},
-    );
-
-    const [query, params] = clickhouseRawQuery.mock.calls[0];
-    expect(query).toContain('url_path like {param0:String}');
-    expect(params).toMatchObject({ param0: '/a/%', param1: '/b' });
-  });
-
-  test('event data filters emit event_id IN subqueries with typed params', async () => {
-    await getFunnel(
-      'website-1',
-      {
-        ...baseParameters,
-        steps: [
-          {
-            type: 'event',
-            value: 'purchase',
-            filters: [{ property: 'plan', operator: 'c', value: 'pro' }],
-          },
-          { type: 'event', value: 'confirm' },
-        ],
-      },
-      {},
-    );
-
-    const [query, params] = clickhouseRawQuery.mock.calls[0];
-    // first step uses level0 alias for event_id
-    expect(query).toContain('and level0.event_id in (');
-    expect(query).toContain('data_key = {f_0_0_k:String}');
-    expect(query).toContain('like {f_0_0_v:String}');
-    expect(params).toMatchObject({ f_0_0_k: 'plan', f_0_0_v: '%pro%' });
   });
 });

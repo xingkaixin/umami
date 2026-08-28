@@ -1,12 +1,16 @@
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, notFound, serviceUnavailable } from '@/lib/response';
 import { generateBackupCodes } from '@/lib/two-factor/backup-codes';
-import { decryptSecret, getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
-import { checkRateLimit, recordFailedAttempt, resetRateLimit } from '@/lib/two-factor/rate-limit';
-import { isOtpReplayed, markOtpUsed } from '@/lib/two-factor/replay-prevention';
+import {
+  decryptSecret,
+  getTwoFactorConfigurationError,
+  isTwoFactorConfigured,
+} from '@/lib/two-factor/crypto';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/two-factor/rate-limit';
+import { isOtpReplayed } from '@/queries/drizzle/twoFactor';
 import { verifyTotp } from '@/lib/two-factor/totp';
+import { confirmTwoFactorSetup, getTwoFactorAuth } from '@/queries/drizzle/twoFactor';
 
 export async function POST(request: Request) {
   if (process.env.CLOUD_MODE) {
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
   const userId = auth.user.id;
   const { token } = body;
 
-  const twoFactor = await prisma.client.twoFactorAuth.findUnique({ where: { userId } });
+  const twoFactor = await getTwoFactorAuth(userId);
 
   // Verify if 2FA is waiting for setup
   if (!twoFactor || twoFactor.isEnabled) {
@@ -71,16 +75,9 @@ export async function POST(request: Request) {
 
   const { plaintext, hashed } = await generateBackupCodes();
 
-  await prisma.transaction(async tx => {
-    await tx.twoFactorAuth.update({ where: { userId }, data: { isEnabled: true } });
-    await tx.twoFactorBackupCode.deleteMany({ where: { userId } });
-    await tx.twoFactorBackupCode.createMany({
-      data: hashed.map(codeHash => ({ userId, codeHash })),
-    });
-    await markOtpUsed(userId, token, tx);
-  });
-
-  await resetRateLimit(userId);
+  if (!(await confirmTwoFactorSetup(userId, token, hashed, twoFactor.secret))) {
+    return badRequest({ code: 'two-factor-error-code-used', message: 'Code already used' });
+  }
 
   return json({ backupCodes: plaintext });
 }

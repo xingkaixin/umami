@@ -1,12 +1,8 @@
-import clickhouse from '@/lib/clickhouse';
-import { HEATMAP_EVENT_TYPE, OPERATORS } from '@/lib/constants';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import { filtersObjectToArray } from '@/lib/params';
-import prisma from '@/lib/prisma';
+import { getColumnFilters, parseFilters } from '@/db/filters';
+import { rawQuery } from '@/db/query';
+import { HEATMAP_EVENT_TYPE } from '@/lib/constants';
 import type { QueryFilters } from '@/lib/types';
-import { getWebsite } from '@/queries/prisma';
-
-const FUNCTION_NAME = 'getHeatmap';
+import { getWebsite } from '@/queries/drizzle';
 
 const POINT_LIMIT = 5000;
 const PAGE_LIMIT = 100;
@@ -73,30 +69,19 @@ export interface HeatmapResult {
   };
 }
 
-export async function getHeatmap(
-  websiteId: string,
-  parameters: HeatmapParameters,
-): Promise<HeatmapResult> {
-  return runQuery({
-    [PRISMA]: () => relationalQuery(websiteId, parameters),
-    [CLICKHOUSE]: () => clickhouseQuery(websiteId, parameters),
-  });
-}
-
 interface HeatmapFilterContext {
   joinQuery: string;
   filterQuery: string;
   queryParams: Record<string, any>;
 }
 
-async function relationalQuery(
+export async function getHeatmap(
   websiteId: string,
   parameters: HeatmapParameters,
 ): Promise<HeatmapResult> {
-  const { rawQuery } = prisma;
   const { startDate, endDate, urlPath, mode = 'click' } = parameters;
   const eventType = mode === 'scroll' ? HEATMAP_EVENT_TYPE.scroll : HEATMAP_EVENT_TYPE.click;
-  const filterContext = getRelationalHeatmapFilterContext(websiteId, parameters);
+  const filterContext = await getHeatmapFilterContext(websiteId, parameters);
   const pageFilter =
     mode === 'click'
       ? `
@@ -121,11 +106,11 @@ async function relationalQuery(
     `
     select
       h.url_path as "urlPath",
-      count(*)::int as count,
-      count(distinct h.visit_id)::int as sessions
+      count(*) as count,
+      count(distinct h.visit_id) as sessions
     from heatmap_event h
     ${filterContext.joinQuery}
-    where h.website_id = {{websiteId::uuid}}
+    where h.website_id = {{websiteId}}
       and h.event_type = {{eventType}}
       and h.created_at between {{startDate}} and {{endDate}}
       ${filterContext.filterQuery}
@@ -135,7 +120,6 @@ async function relationalQuery(
     limit ${PAGE_LIMIT}
     `,
     { ...filterContext.queryParams, websiteId, eventType, startDate, endDate },
-    FUNCTION_NAME,
   );
   const pages = rawPages;
 
@@ -153,40 +137,36 @@ async function relationalQuery(
       viewportH: number | string;
     }[] = await rawQuery(
       `
-      select
-        (floor(max_pct / ${SCROLL_BUCKET_SIZE}) * ${SCROLL_BUCKET_SIZE})::int as depth,
-        count(*)::int as sessions,
-        page_w::int as "pageW",
-        page_h::int as "pageH",
-        viewport_w::int as "viewportW",
-        viewport_h::int as "viewportH"
-      from (
-        select
-          h.visit_id,
-          max(h.scroll_pct) as max_pct,
-          (mode() within group (order by h.page_w))::int as page_w,
-          (mode() within group (order by h.page_h))::int as page_h,
-          (mode() within group (order by h.viewport_w))::int as viewport_w,
-          (mode() within group (order by h.viewport_h))::int as viewport_h
-        from heatmap_event h
-        ${filterContext.joinQuery}
-        where h.website_id = {{websiteId::uuid}}
-          and h.event_type = {{eventType}}
-          and h.url_path = {{urlPath}}
+      with filtered as (
+        select h.visit_id, h.scroll_pct, h.page_w, h.page_h, h.viewport_w, h.viewport_h
+        from heatmap_event h ${filterContext.joinQuery}
+        where h.website_id = {{websiteId}} and h.event_type = {{eventType}} and h.url_path = {{urlPath}}
           and h.created_at between {{startDate}} and {{endDate}}
           ${filterContext.filterQuery}
-          and h.scroll_pct is not null
-          and h.page_w is not null
-          and h.page_h is not null
-          and h.viewport_w is not null
-          and h.viewport_h is not null
-        group by h.visit_id
-      ) per_session
-      group by depth, page_w, page_h, viewport_w, viewport_h
-      order by depth
+          and h.scroll_pct is not null and h.page_w is not null and h.page_h is not null
+          and h.viewport_w is not null and h.viewport_h is not null
+      ), sizes as (
+        select visit_id, dimension.key, dimension.value, count(*) as frequency
+        from filtered, json_each(json_object('page_w', page_w, 'page_h', page_h, 'viewport_w', viewport_w, 'viewport_h', viewport_h)) dimension
+        group by visit_id, dimension.key, dimension.value
+      ), ranked_sizes as (
+        select *, row_number() over (partition by visit_id, key order by frequency desc, value) as rank from sizes
+      ), geometry as (
+        select visit_id,
+          max(case when key = 'page_w' then value end) as page_w,
+          max(case when key = 'page_h' then value end) as page_h,
+          max(case when key = 'viewport_w' then value end) as viewport_w,
+          max(case when key = 'viewport_h' then value end) as viewport_h
+        from ranked_sizes where rank = 1 group by visit_id
+      ), scroll_depth as (
+        select visit_id, max(scroll_pct) as max_pct from filtered group by visit_id
+      )
+      select floor(max_pct / ${SCROLL_BUCKET_SIZE}) * ${SCROLL_BUCKET_SIZE} as depth,
+        count(*) as sessions, page_w as "pageW", page_h as "pageH", viewport_w as "viewportW", viewport_h as "viewportH"
+      from scroll_depth join geometry using (visit_id)
+      group by depth, page_w, page_h, viewport_w, viewport_h order by depth
       `,
       { ...filterContext.queryParams, websiteId, eventType, urlPath, startDate, endDate },
-      FUNCTION_NAME,
     );
 
     const scrollBuckets = bucketRows.map(r => ({
@@ -235,10 +215,10 @@ async function relationalQuery(
       h.page_h as "pageH",
       h.viewport_w as "viewportW",
       h.viewport_h as "viewportH",
-      count(*)::int as count
+      count(*) as count
     from heatmap_event h
     ${filterContext.joinQuery}
-    where h.website_id = {{websiteId::uuid}}
+    where h.website_id = {{websiteId}}
       and h.event_type = {{eventType}}
       and h.url_path = {{urlPath}}
       and h.created_at between {{startDate}} and {{endDate}}
@@ -264,7 +244,6 @@ async function relationalQuery(
     limit ${POINT_LIMIT}
     `,
     { ...filterContext.queryParams, websiteId, eventType, urlPath, startDate, endDate },
-    FUNCTION_NAME,
   );
 
   const viewport = pickSnapshotViewport(rawPoints);
@@ -280,235 +259,6 @@ async function relationalQuery(
   return { mode, pages, points: rawPoints, snapshot, scroll: emptyScroll() };
 }
 
-async function clickhouseQuery(
-  websiteId: string,
-  parameters: HeatmapParameters,
-): Promise<HeatmapResult> {
-  const { rawQuery } = clickhouse;
-  const { startDate, endDate, urlPath, mode = 'click' } = parameters;
-  const eventType = mode === 'scroll' ? HEATMAP_EVENT_TYPE.scroll : HEATMAP_EVENT_TYPE.click;
-  const filterContext = getClickhouseHeatmapFilterContext(websiteId, parameters);
-  const pageFilter =
-    mode === 'click'
-      ? `
-      and x is not null
-      and y is not null
-      and page_x is not null
-      and page_y is not null
-      and page_w is not null
-      and page_h is not null
-      and viewport_w is not null
-      and viewport_h is not null
-    `
-      : `
-      and scroll_pct is not null
-      and page_w is not null
-      and page_h is not null
-      and viewport_w is not null
-      and viewport_h is not null
-    `;
-
-  const pageRows = await rawQuery<
-    { urlPath: string; count: string | number; sessions: string | number }[]
-  >(
-    `
-    select
-      h.url_path as urlPath,
-      count() as count,
-      uniq(h.visit_id) as sessions
-    from heatmap_event h
-    ${filterContext.joinQuery}
-    where h.website_id = {websiteId:UUID}
-      and h.event_type = {eventType:UInt8}
-      and h.created_at between {startDate:DateTime64} and {endDate:DateTime64}
-      ${filterContext.filterQuery}
-      ${pageFilter}
-    group by h.url_path
-    order by sessions desc, count desc
-    limit ${PAGE_LIMIT}
-    `,
-    { ...filterContext.queryParams, websiteId, eventType, startDate, endDate },
-    FUNCTION_NAME,
-  );
-
-  const pages: HeatmapPage[] = pageRows
-    .map(p => ({
-      urlPath: p.urlPath,
-      count: Number(p.count),
-      sessions: Number(p.sessions),
-    }));
-
-  if (!urlPath) {
-    return { mode, pages, points: [], snapshot: null, scroll: emptyScroll() };
-  }
-
-  if (mode === 'scroll') {
-    const bucketRows = await rawQuery<
-      {
-        depth: number | string;
-        sessions: number | string;
-        pageW: number | string;
-        pageH: number | string;
-        viewportW: number | string;
-        viewportH: number | string;
-      }[]
-    >(
-      `
-      select
-        intDiv(max_pct, ${SCROLL_BUCKET_SIZE}) * ${SCROLL_BUCKET_SIZE} as depth,
-        count() as sessions,
-        pageW,
-        pageH,
-        viewportW,
-        viewportH
-      from (
-        select
-          h.visit_id,
-          max(h.scroll_pct) as max_pct,
-          toInt32OrNull(toString(arrayElement(topK(1)(h.page_w), 1))) as pageW,
-          toInt32OrNull(toString(arrayElement(topK(1)(h.page_h), 1))) as pageH,
-          toInt32OrNull(toString(arrayElement(topK(1)(h.viewport_w), 1))) as viewportW,
-          toInt32OrNull(toString(arrayElement(topK(1)(h.viewport_h), 1))) as viewportH
-        from heatmap_event h
-        ${filterContext.joinQuery}
-        where h.website_id = {websiteId:UUID}
-          and h.event_type = {eventType:UInt8}
-          and h.url_path = {urlPath:String}
-          and h.created_at between {startDate:DateTime64} and {endDate:DateTime64}
-          ${filterContext.filterQuery}
-          and h.scroll_pct is not null
-          and h.page_w is not null
-          and h.page_h is not null
-          and h.viewport_w is not null
-          and h.viewport_h is not null
-        group by h.visit_id
-      )
-      where pageW is not null
-        and pageH is not null
-        and viewportW is not null
-        and viewportH is not null
-      group by depth, pageW, pageH, viewportW, viewportH
-      order by depth
-      `,
-      { ...filterContext.queryParams, websiteId, eventType, urlPath, startDate, endDate },
-      FUNCTION_NAME,
-    );
-
-    const scrollBuckets = bucketRows.map(r => ({
-      depth: Number(r.depth),
-      sessions: Number(r.sessions),
-      pageW: Number(r.pageW),
-      pageH: Number(r.pageH),
-      viewportW: Number(r.viewportW),
-      viewportH: Number(r.viewportH),
-    }));
-    const viewport = pickScrollSnapshotViewport(scrollBuckets);
-    const scroll = {
-      buckets: scrollBuckets,
-      totalSessions: scrollBuckets.reduce((sum, bucket) => sum + bucket.sessions, 0),
-      pageW: viewport?.pageW ?? null,
-      pageH: viewport?.pageH ?? null,
-      viewportW: viewport?.width ?? null,
-      viewportH: viewport?.height ?? null,
-    };
-    const snapshot = await resolveHeatmapSnapshot({
-      websiteId,
-      urlPath,
-      viewportW: viewport?.width ?? null,
-      viewportH: viewport?.height ?? null,
-      pageW: viewport?.pageW ?? null,
-      pageH: viewport?.pageH ?? null,
-    });
-
-    return {
-      mode,
-      pages,
-      points: [],
-      snapshot,
-      scroll,
-    };
-  }
-
-  const pointRows = await rawQuery<
-    {
-      x: number;
-      y: number;
-      pageX: number;
-      pageY: number;
-      pageW: number;
-      pageH: number;
-      viewportW: number;
-      viewportH: number;
-      count: string | number;
-    }[]
-  >(
-    `
-    select
-      h.x,
-      h.y,
-      h.page_x as pageX,
-      h.page_y as pageY,
-      h.page_w as pageW,
-      h.page_h as pageH,
-      h.viewport_w as viewportW,
-      h.viewport_h as viewportH,
-      count() as count
-    from heatmap_event h
-    ${filterContext.joinQuery}
-    where h.website_id = {websiteId:UUID}
-      and h.event_type = {eventType:UInt8}
-      and h.url_path = {urlPath:String}
-      and h.created_at between {startDate:DateTime64} and {endDate:DateTime64}
-      ${filterContext.filterQuery}
-      and h.x is not null
-      and h.y is not null
-      and h.page_x is not null
-      and h.page_y is not null
-      and h.page_w is not null
-      and h.page_h is not null
-      and h.viewport_w is not null
-      and h.viewport_h is not null
-    group by
-      h.x,
-      h.y,
-      h.page_x,
-      h.page_y,
-      h.page_w,
-      h.page_h,
-      h.viewport_w,
-      h.viewport_h
-    order by count desc
-    limit ${POINT_LIMIT}
-    `,
-    { ...filterContext.queryParams, websiteId, eventType, urlPath, startDate, endDate },
-    FUNCTION_NAME,
-  );
-
-  const points: HeatmapPoint[] = pointRows.map(p => ({
-    x: Number(p.x),
-    y: Number(p.y),
-    pageX: Number(p.pageX),
-    pageY: Number(p.pageY),
-    pageW: Number(p.pageW),
-    pageH: Number(p.pageH),
-    viewportW: Number(p.viewportW),
-    viewportH: Number(p.viewportH),
-    count: Number(p.count),
-  }));
-
-  const viewport = pickSnapshotViewport(points);
-  const snapshot = await resolveHeatmapSnapshot({
-    websiteId,
-    urlPath,
-    viewportW: viewport?.width ?? null,
-    viewportH: viewport?.height ?? null,
-    pageW: viewport?.pageW ?? null,
-    pageH: viewport?.pageH ?? null,
-  });
-
-  return { mode, pages, points, snapshot, scroll: emptyScroll() };
-}
-
 function emptyScroll(): HeatmapResult['scroll'] {
   return {
     buckets: [],
@@ -521,31 +271,6 @@ function emptyScroll(): HeatmapResult['scroll'] {
 }
 
 async function resolveHeatmapSnapshot({
-  websiteId,
-  urlPath,
-  viewportW,
-  viewportH,
-  pageW,
-  pageH,
-}: {
-  websiteId: string;
-  urlPath: string;
-  viewportW: number | null;
-  viewportH: number | null;
-  pageW: number | null;
-  pageH: number | null;
-}): Promise<HeatmapSnapshot | null> {
-  return getIframeSnapshot({
-    websiteId,
-    urlPath,
-    viewportW,
-    viewportH,
-    pageW,
-    pageH,
-  });
-}
-
-async function getIframeSnapshot({
   websiteId,
   urlPath,
   viewportW,
@@ -740,140 +465,31 @@ function pickScrollSnapshotViewport(
   };
 }
 
-function getHeatmapPathFilters(filters: QueryFilters) {
-  return filtersObjectToArray(filters).filter(filter => filter.name === 'path');
-}
-
 function omitHeatmapPathFilters(filters: QueryFilters): QueryFilters {
   return Object.fromEntries(
     Object.entries(filters).filter(([key]) => key.replace(/\d+$/, '') !== 'path'),
   ) as QueryFilters;
 }
 
-function getRelationalHeatmapPathFilterContext(filters: QueryFilters) {
-  const pathFilters = getHeatmapPathFilters(filters);
-
-  if (!pathFilters.length) {
-    return { filterQuery: '', queryParams: {} };
-  }
-
-  const clauses = pathFilters.map(({ operator, paramName, name }) => {
-    const key = paramName ?? name;
-
-    switch (operator) {
-      case OPERATORS.equals:
-        return `h.url_path = ANY({{${key}}})`;
-      case OPERATORS.notEquals:
-        return `h.url_path != ALL({{${key}}})`;
-      case OPERATORS.contains:
-        return `h.url_path ilike {{${key}}}`;
-      case OPERATORS.doesNotContain:
-        return `h.url_path not ilike {{${key}}}`;
-      case OPERATORS.regex:
-        return `h.url_path ~* {{${key}}}`;
-      case OPERATORS.notRegex:
-        return `h.url_path !~* {{${key}}}`;
-      default:
-        return '';
-    }
-  });
-
-  const queryParams = Object.fromEntries(
-    pathFilters.map(({ operator, value, paramName, name }) => {
-      const key = paramName ?? name;
-
-      if (operator === OPERATORS.contains || operator === OPERATORS.doesNotContain) {
-        return [key, `%${value}%`];
-      }
-
-      if (operator === OPERATORS.equals || operator === OPERATORS.notEquals) {
-        return [key, Array.isArray(value) ? value : [value]];
-      }
-
-      return [key, Array.isArray(value) ? value[0] : value];
-    }),
-  );
-
-  const joinedClauses =
-    filters.match === 'any'
-      ? clauses.filter(Boolean).join('\n        or ')
-      : clauses.filter(Boolean).join('\n      and ');
-
-  return {
-    filterQuery:
-      filters.match === 'any'
-        ? `and (\n        ${joinedClauses}\n      )`
-        : clauses.length
-          ? `and ${joinedClauses}`
-          : '',
-    queryParams,
-  };
-}
-
-function getClickhouseHeatmapPathFilterContext(filters: QueryFilters) {
-  const pathFilters = getHeatmapPathFilters(filters);
-
-  if (!pathFilters.length) {
-    return { filterQuery: '', queryParams: {} };
-  }
-
-  const clauses = pathFilters.map(({ operator, paramName, name }) => {
-    const key = paramName ?? name;
-
-    switch (operator) {
-      case OPERATORS.equals:
-        return `h.url_path IN {${key}:Array(String)}`;
-      case OPERATORS.notEquals:
-        return `h.url_path NOT IN {${key}:Array(String)}`;
-      case OPERATORS.contains:
-        return `positionCaseInsensitive(h.url_path, {${key}:String}) > 0`;
-      case OPERATORS.doesNotContain:
-        return `positionCaseInsensitive(h.url_path, {${key}:String}) = 0`;
-      case OPERATORS.regex:
-        return `match(h.url_path, concat('(?i)', {${key}:String}))`;
-      case OPERATORS.notRegex:
-        return `not match(h.url_path, concat('(?i)', {${key}:String}))`;
-      default:
-        return '';
-    }
-  });
-
-  const queryParams = Object.fromEntries(
-    pathFilters.map(({ operator, value, paramName, name }) => {
-      const key = paramName ?? name;
-
-      if (operator === OPERATORS.equals || operator === OPERATORS.notEquals) {
-        return [key, Array.isArray(value) ? value : [value]];
-      }
-
-      return [key, Array.isArray(value) ? value[0] : value];
-    }),
-  );
-
-  const joinedClauses =
-    filters.match === 'any'
-      ? clauses.filter(Boolean).join('\n        or ')
-      : clauses.filter(Boolean).join('\n      and ');
-
-  return {
-    filterQuery:
-      filters.match === 'any'
-        ? `and (\n        ${joinedClauses}\n      )`
-        : clauses.length
-          ? `and ${joinedClauses}`
-          : '',
-    queryParams,
-  };
-}
-
-function getRelationalHeatmapFilterContext(
+async function getHeatmapFilterContext(
   websiteId: string,
   filters: QueryFilters,
-): HeatmapFilterContext {
-  const { parseFilters } = prisma;
-  const pathFilterContext = getRelationalHeatmapPathFilterContext(filters);
+): Promise<HeatmapFilterContext> {
+  const pathFilters = Object.fromEntries(
+    Object.entries(filters).filter(([key]) => key.replace(/\d+$/, '') === 'path'),
+  );
+  const { sql: pathQuery, params: pathParams } = await getColumnFilters(
+    {
+      websiteId,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      match: filters.match,
+      ...pathFilters,
+    },
+    { table: 'heatmap_event' },
+  );
   const { filterQuery, cohortQuery, excludeBounceQuery, joinSessionQuery, queryParams } =
-    parseFilters({
+    await parseFilters({
       ...omitHeatmapPathFilters(filters),
       websiteId,
     });
@@ -881,8 +497,8 @@ function getRelationalHeatmapFilterContext(
   if (!(filterQuery || cohortQuery || excludeBounceQuery)) {
     return {
       joinQuery: '',
-      filterQuery: pathFilterContext.filterQuery,
-      queryParams: pathFilterContext.queryParams,
+      filterQuery: pathQuery,
+      queryParams: pathParams,
     };
   }
 
@@ -894,7 +510,7 @@ function getRelationalHeatmapFilterContext(
       ${joinSessionQuery}
       ${cohortQuery}
       ${excludeBounceQuery}
-      where website_event.website_id = {{websiteId::uuid}}
+      where website_event.website_id = {{websiteId}}
         and website_event.created_at between {{startDate}} and {{endDate}}
         ${filterQuery}
     ) filtered_visits
@@ -902,46 +518,7 @@ function getRelationalHeatmapFilterContext(
       and filtered_visits.session_id = h.session_id
       and filtered_visits.visit_id = h.visit_id
     `,
-    filterQuery: pathFilterContext.filterQuery,
-    queryParams: { ...queryParams, ...pathFilterContext.queryParams },
-  };
-}
-
-function getClickhouseHeatmapFilterContext(
-  websiteId: string,
-  filters: QueryFilters,
-): HeatmapFilterContext {
-  const { parseFilters } = clickhouse;
-  const pathFilterContext = getClickhouseHeatmapPathFilterContext(filters);
-  const { filterQuery, cohortQuery, excludeBounceQuery, queryParams } = parseFilters({
-    ...omitHeatmapPathFilters(filters),
-    websiteId,
-  });
-
-  if (!(filterQuery || cohortQuery || excludeBounceQuery)) {
-    return {
-      joinQuery: '',
-      filterQuery: pathFilterContext.filterQuery,
-      queryParams: pathFilterContext.queryParams,
-    };
-  }
-
-  return {
-    joinQuery: `
-    inner join (
-      select distinct website_id, session_id, visit_id
-      from website_event
-      ${cohortQuery}
-      ${excludeBounceQuery}
-      where website_id = {websiteId:UUID}
-        and created_at between {startDate:DateTime64} and {endDate:DateTime64}
-        ${filterQuery}
-    ) filtered_visits
-      on filtered_visits.website_id = h.website_id
-      and filtered_visits.session_id = h.session_id
-      and filtered_visits.visit_id = h.visit_id
-    `,
-    filterQuery: pathFilterContext.filterQuery,
-    queryParams: { ...queryParams, ...pathFilterContext.queryParams },
+    filterQuery: pathQuery,
+    queryParams: { ...queryParams, ...pathParams },
   };
 }

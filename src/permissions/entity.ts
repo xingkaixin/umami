@@ -2,7 +2,7 @@ import { hasPermission } from '@/lib/auth';
 import { PERMISSIONS } from '@/lib/constants';
 import { getEntity } from '@/lib/entity';
 import type { Auth } from '@/lib/types';
-import { getTeamUser } from '@/queries/prisma';
+import { getTeamUser } from '@/queries/drizzle';
 
 export async function canViewEntity({ user }: Auth, entityId: string) {
   if (!user) {

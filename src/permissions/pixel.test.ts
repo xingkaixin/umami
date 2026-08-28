@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { getPixel, getTeamUser } from '@/queries/prisma';
+import { getPixel, getTeamUser } from '@/queries/drizzle';
 import { canDeletePixel, canUpdatePixel, canViewPixel } from './pixel';
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getPixel: vi.fn(),
   getTeamUser: vi.fn(),
 }));

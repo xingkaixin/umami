@@ -1,0 +1,2 @@
+APP_SECRET=replace-with-a-random-64-character-hex-string
+TWO_FACTOR_ENCRYPTION_KEY=replace-with-another-random-64-character-hex-string

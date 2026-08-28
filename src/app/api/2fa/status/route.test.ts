@@ -5,36 +5,16 @@ import { GET } from './route';
 const KEY = 'a'.repeat(64);
 const mocks = vi.hoisted(() => ({
   findTwoFactorAuth: vi.fn(),
-  findAppSetting: vi.fn(),
-  findUser: vi.fn(),
-  findTeamUsers: vi.fn(),
-  findTeams: vi.fn(),
+  getTwoFactorRequirements: vi.fn(),
 }));
 
 vi.mock('@/lib/request', () => ({
   parseRequest: vi.fn(),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    client: {
-      twoFactorAuth: {
-        findUnique: mocks.findTwoFactorAuth,
-      },
-      appSetting: {
-        findUnique: mocks.findAppSetting,
-      },
-      user: {
-        findUnique: mocks.findUser,
-      },
-      teamUser: {
-        findMany: mocks.findTeamUsers,
-      },
-      team: {
-        findMany: mocks.findTeams,
-      },
-    },
-  },
+vi.mock('@/queries/drizzle/twoFactor', () => ({
+  getTwoFactorAuth: mocks.findTwoFactorAuth,
+  getTwoFactorRequirements: mocks.getTwoFactorRequirements,
 }));
 
 const parseRequestMock = vi.mocked(parseRequest);
@@ -43,10 +23,7 @@ beforeEach(() => {
   vi.unstubAllEnvs();
   parseRequestMock.mockReset();
   mocks.findTwoFactorAuth.mockReset();
-  mocks.findAppSetting.mockReset();
-  mocks.findUser.mockReset();
-  mocks.findTeamUsers.mockReset();
-  mocks.findTeams.mockReset();
+  mocks.getTwoFactorRequirements.mockReset();
 
   parseRequestMock.mockResolvedValue({
     auth: {
@@ -57,13 +34,7 @@ beforeEach(() => {
     error: undefined,
   });
   mocks.findTwoFactorAuth.mockResolvedValue(null as any);
-  mocks.findAppSetting.mockResolvedValue({
-    key: 'twoFactorRequiredGlobal',
-    value: 'true',
-  } as any);
-  mocks.findUser.mockResolvedValue({ twoFactorRequired: false } as any);
-  mocks.findTeamUsers.mockResolvedValue([] as any);
-  mocks.findTeams.mockResolvedValue([] as any);
+  mocks.getTwoFactorRequirements.mockResolvedValue({ global: true, user: false, team: false });
 });
 
 test('GET requires 2FA when it is globally enabled', async () => {

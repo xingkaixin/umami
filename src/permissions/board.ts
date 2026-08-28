@@ -2,7 +2,7 @@ import { hasPermission } from '@/lib/auth';
 import { BOARD_ENTITY_TYPES, getBoardEntityIds, getResolvedComponentEntity } from '@/lib/boards';
 import { PERMISSIONS } from '@/lib/constants';
 import type { Auth, BoardComponentConfig, BoardParameters } from '@/lib/types';
-import { getBoard, getReport, getTeamUser } from '@/queries/prisma';
+import { getBoard, getReport, getTeamUser } from '@/queries/drizzle';
 import { canViewLink } from './link';
 import { canViewPixel } from './pixel';
 import { canViewWebsite } from './website';

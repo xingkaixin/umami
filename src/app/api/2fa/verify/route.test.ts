@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   recordFailedAttempt: vi.fn(),
   resetRateLimit: vi.fn(),
   isOtpReplayed: vi.fn(),
-  markOtpUsed: vi.fn(),
+  consumeOtp: vi.fn(),
   verifyTotp: vi.fn(),
   secret: vi.fn(),
 }));
@@ -28,6 +28,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/crypto', () => ({
+  hash: () => 'password-fingerprint',
   secret: mocks.secret,
 }));
 
@@ -36,23 +37,18 @@ vi.mock('@/lib/jwt', () => ({
   parseSecureToken: mocks.parseSecureToken,
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getAllUserTeams: mocks.getAllUserTeams,
   getUser: mocks.getUser,
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    client: {
-      twoFactorAuth: {
-        findUnique: mocks.findTwoFactorAuth,
-      },
-      twoFactorBackupCode: {
-        findMany: mocks.findBackupCodes,
-        updateMany: mocks.updateBackupCodes,
-      },
-    },
-  },
+vi.mock('@/queries/drizzle/twoFactor', () => ({
+  isOtpReplayed: mocks.isOtpReplayed,
+  consumeOtp: mocks.consumeOtp,
+
+  getTwoFactorAuth: mocks.findTwoFactorAuth,
+  getUnusedBackupCodes: mocks.findBackupCodes,
+  consumeBackupCode: mocks.updateBackupCodes,
 }));
 
 vi.mock('@/lib/two-factor/backup-codes', () => ({
@@ -72,11 +68,6 @@ vi.mock('@/lib/two-factor/rate-limit', () => ({
   checkRateLimit: mocks.checkRateLimit,
   recordFailedAttempt: mocks.recordFailedAttempt,
   resetRateLimit: mocks.resetRateLimit,
-}));
-
-vi.mock('@/lib/two-factor/replay-prevention', () => ({
-  isOtpReplayed: mocks.isOtpReplayed,
-  markOtpUsed: mocks.markOtpUsed,
 }));
 
 vi.mock('@/lib/two-factor/totp', () => ({
@@ -108,7 +99,7 @@ beforeEach(() => {
   mocks.recordFailedAttempt.mockReset();
   mocks.resetRateLimit.mockReset();
   mocks.isOtpReplayed.mockReset();
-  mocks.markOtpUsed.mockReset();
+  mocks.consumeOtp.mockReset();
   mocks.verifyTotp.mockReset();
   mocks.secret.mockReset();
 
@@ -122,7 +113,11 @@ beforeEach(() => {
     createdAt: new Date('2026-07-23T00:00:00.000Z'),
   });
   mocks.getAllUserTeams.mockResolvedValue([]);
-  mocks.findTwoFactorAuth.mockResolvedValue({ userId: 'user-1', isEnabled: true, secret: 'encrypted' });
+  mocks.findTwoFactorAuth.mockResolvedValue({
+    userId: 'user-1',
+    isEnabled: true,
+    secret: 'encrypted',
+  });
   mocks.createSecureToken.mockReturnValue('full-auth-token');
   mocks.decryptSecret.mockReturnValue('plain-secret');
   mocks.isTwoFactorConfigured.mockReturnValue(true);
@@ -130,10 +125,10 @@ beforeEach(() => {
   mocks.recordFailedAttempt.mockResolvedValue({ lockedUntil: undefined });
   mocks.resetRateLimit.mockResolvedValue(undefined);
   mocks.isOtpReplayed.mockResolvedValue(false);
-  mocks.markOtpUsed.mockResolvedValue(undefined);
+  mocks.consumeOtp.mockResolvedValue(true);
   mocks.verifyTotp.mockResolvedValue(true);
   mocks.findBackupCodes.mockResolvedValue([]);
-  mocks.updateBackupCodes.mockResolvedValue({ count: 0 });
+  mocks.updateBackupCodes.mockResolvedValue(false);
   mocks.verifyBackupCode.mockResolvedValue(null);
 });
 
@@ -150,7 +145,7 @@ test('POST accepts a token-only payload and completes 2FA verification', async (
   );
 
   expect(mocks.verifyTotp).toHaveBeenCalledWith('123456', 'plain-secret');
-  expect(mocks.markOtpUsed).toHaveBeenCalledWith('user-1', '123456');
+  expect(mocks.consumeOtp).toHaveBeenCalledWith('user-1', '123456', 'encrypted');
   expect(mocks.resetRateLimit).toHaveBeenCalledWith('user-1');
   await expect(response.json()).resolves.toMatchObject({
     token: 'full-auth-token',

@@ -2,7 +2,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { ROLES } from '@/lib/constants';
 import { parseRequest } from '@/lib/request';
 import { canDeleteTeamUser, canUpdateTeam } from '@/permissions';
-import { deleteTeamUser, getTeamUser, updateTeamUser } from '@/queries/prisma';
+import { deleteTeamUser, getTeamUser, updateTeamUser } from '@/queries/drizzle';
 import { DELETE, POST } from './route';
 
 vi.mock('@/lib/request', () => ({
@@ -14,7 +14,7 @@ vi.mock('@/permissions', () => ({
   canUpdateTeam: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   deleteTeamUser: vi.fn(),
   getTeamUser: vi.fn(),
   updateTeamUser: vi.fn(),
@@ -60,9 +60,12 @@ test('POST rejects a manager modifying the team owner role', async () => {
       role: ROLES.teamManager,
     } as any);
 
-  const response = await POST(new Request('http://localhost/api/teams/team-1/users/owner-id', { method: 'POST' }), {
-    params: Promise.resolve({ teamId: 'team-1', userId: 'owner-id' }),
-  });
+  const response = await POST(
+    new Request('http://localhost/api/teams/team-1/users/owner-id', { method: 'POST' }),
+    {
+      params: Promise.resolve({ teamId: 'team-1', userId: 'owner-id' }),
+    },
+  );
 
   expect(response.status).toBe(401);
   expect(updateTeamUserMock).not.toHaveBeenCalled();

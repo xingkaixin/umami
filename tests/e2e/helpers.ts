@@ -39,7 +39,8 @@ export async function loginViaApi(
 export async function loginPage(page: Page, request: APIRequestContext): Promise<Auth> {
   const auth = await loginViaApi(request);
 
-  await page.addInitScript(token => {
+  await page.goto('/login');
+  await page.evaluate(token => {
     window.localStorage.setItem('umami.auth', JSON.stringify(token));
   }, auth.token);
 
@@ -47,8 +48,8 @@ export async function loginPage(page: Page, request: APIRequestContext): Promise
 }
 
 export async function logout(page: Page) {
-  await page.getByTestId('button-profile').click();
-  await page.getByTestId('item-logout').click();
+  await page.getByRole('button', { name: umamiUser.username, exact: true }).first().click();
+  await page.getByRole('menuitem', { name: 'Logout', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
@@ -69,6 +70,7 @@ export async function addWebsite(
   });
 
   expect(response.status()).toBe(200);
+  return response.json();
 }
 
 export async function deleteWebsite(request: APIRequestContext, auth: Auth, websiteId: string) {

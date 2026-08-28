@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { hasValidBoardReports } from '@/permissions';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
-import { createBoard, getBoard, updateBoard } from '@/queries/prisma';
+import { createBoard, getBoard, updateBoard } from '@/queries/drizzle';
 
 export async function GET(request: Request) {
   const { auth, error } = await parseRequest(request);

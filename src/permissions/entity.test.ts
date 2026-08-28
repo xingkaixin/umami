@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { getEntity } from '@/lib/entity';
-import { getTeamUser } from '@/queries/prisma';
+import { getTeamUser } from '@/queries/drizzle';
 import { canDeleteEntity, canUpdateEntity, canViewEntity } from './entity';
 
 vi.mock('@/lib/entity', () => ({
   getEntity: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getTeamUser: vi.fn(),
 }));
 

@@ -1,22 +1,6 @@
-import type { EventData } from '@/generated/prisma/client';
-import clickhouse from '@/lib/clickhouse';
-import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
-import prisma from '@/lib/prisma';
+import { rawQuery } from '@/db/query';
 
-const FUNCTION_NAME = 'getEventDataById';
-
-export async function getEventDataById(
-  ...args: [websiteId: string, eventId: string]
-): Promise<EventData[]> {
-  return runQuery({
-    [PRISMA]: () => relationalQuery(...args),
-    [CLICKHOUSE]: () => clickhouseQuery(...args),
-  });
-}
-
-async function relationalQuery(websiteId: string, eventId: string) {
-  const { rawQuery } = prisma;
-
+export async function getEventDataById(websiteId: string, eventId: string) {
   return rawQuery(
     `
     select event_data.website_id as "websiteId",
@@ -30,34 +14,10 @@ async function relationalQuery(websiteId: string, eventId: string) {
        event_data.created_at as "createdAt"
     from event_data
     join website_event on website_event.event_id = event_data.website_event_id
-      and website_event.website_id = {{websiteId::uuid}}
-    where event_data.website_id = {{websiteId::uuid}}
-      and event_data.website_event_id = {{eventId::uuid}}
+      and website_event.website_id = {{websiteId}}
+    where event_data.website_id = {{websiteId}}
+      and event_data.website_event_id = {{eventId}}
     `,
     { websiteId, eventId },
-    FUNCTION_NAME,
-  );
-}
-
-async function clickhouseQuery(websiteId: string, eventId: string): Promise<EventData[]> {
-  const { rawQuery } = clickhouse;
-
-  return rawQuery(
-    `
-      select website_id as websiteId,
-        event_id as eventId,
-        event_name as eventName,
-        data_key as dataKey,
-        string_value as stringValue,
-        number_value as numberValue,
-        date_value as dateValue,
-        data_type as dataType,
-        created_at as createdAt
-      from event_data
-      where website_id = {websiteId:UUID}
-        and event_id = {eventId:UUID}
-    `,
-    { websiteId, eventId },
-    FUNCTION_NAME,
   );
 }

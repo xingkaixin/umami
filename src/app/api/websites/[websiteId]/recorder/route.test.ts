@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { parseRequest } from '@/lib/request';
-import { getWebsite } from '@/queries/prisma';
+import { getWebsite } from '@/queries/drizzle';
 import { GET, OPTIONS } from './route';
 
 vi.mock('@/lib/request', () => ({
   parseRequest: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getWebsite: vi.fn(),
 }));
 

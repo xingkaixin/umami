@@ -1,6 +1,6 @@
-import prisma from '@/lib/prisma';
 import { parseRequest } from '@/lib/request';
 import { json, notFound } from '@/lib/response';
+import { cancelPendingTwoFactor } from '@/queries/drizzle/twoFactor';
 
 export async function POST(request: Request) {
   if (process.env.CLOUD_MODE) {
@@ -15,9 +15,7 @@ export async function POST(request: Request) {
 
   const userId = auth.user.id;
 
-  await prisma.client.twoFactorAuth.deleteMany({
-    where: { userId, isEnabled: false },
-  });
+  await cancelPendingTwoFactor(userId);
 
   return json({ ok: true });
 }

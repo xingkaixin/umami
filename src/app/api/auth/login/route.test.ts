@@ -17,7 +17,7 @@ vi.mock('@/lib/request', () => ({
   parseRequest: mocks.parseRequest,
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   getAllUserTeams: mocks.getAllUserTeams,
   getUserByUsername: mocks.getUserByUsername,
 }));
@@ -26,14 +26,8 @@ vi.mock('@/lib/password', () => ({
   checkPassword: mocks.checkPassword,
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    client: {
-      twoFactorAuth: {
-        findUnique: mocks.findTwoFactorAuth,
-      },
-    },
-  },
+vi.mock('@/queries/drizzle/twoFactor', () => ({
+  getTwoFactorAuth: mocks.findTwoFactorAuth,
 }));
 
 vi.mock('@/lib/jwt', () => ({

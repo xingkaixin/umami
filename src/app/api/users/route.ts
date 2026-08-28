@@ -6,7 +6,7 @@ import { parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
 import { userRoleParam } from '@/lib/schema';
 import { canCreateUser } from '@/permissions';
-import { createUser, getUserByUsername } from '@/queries/prisma';
+import { createUser, getUserByUsername } from '@/queries/drizzle';
 
 export async function POST(request: Request) {
   const schema = z.object({

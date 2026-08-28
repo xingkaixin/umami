@@ -1,6 +1,6 @@
 import { parseRequest } from '@/lib/request';
 import { json } from '@/lib/response';
-import { getAllUserTeams } from '@/queries/prisma';
+import { getAllUserTeams } from '@/queries/drizzle';
 
 export async function POST(request: Request) {
   const { auth, error } = await parseRequest(request);

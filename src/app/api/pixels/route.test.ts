@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { parseRequest } from '@/lib/request';
 import { canCreateTeamWebsite, canCreateWebsite } from '@/permissions';
-import { createPixel } from '@/queries/prisma';
+import { createPixel } from '@/queries/drizzle';
 import { POST } from './route';
 
 vi.mock('@/lib/request', () => ({
@@ -14,7 +14,7 @@ vi.mock('@/permissions', () => ({
   canCreateWebsite: vi.fn(),
 }));
 
-vi.mock('@/queries/prisma', () => ({
+vi.mock('@/queries/drizzle', () => ({
   createPixel: vi.fn(),
   getUserPixels: vi.fn(),
 }));
