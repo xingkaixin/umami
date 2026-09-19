@@ -2,6 +2,23 @@ import { expect, test } from '@playwright/test';
 import { addWebsite, deleteWebsite, loginPage } from './helpers';
 
 test.describe('Website tests', () => {
+  test('renders the analytics map and country tooltips', async ({ page, request }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const auth = await loginPage(page, request);
+    const website = await addWebsite(request, auth, 'Map test', 'maptest.com');
+    try {
+      await page.goto(`/websites/${website.id}`);
+      const country = page.locator('.rsm-geography').first();
+      await expect(country).toBeVisible();
+      await country.hover();
+      await expect(page.getByText(/: 0 visitors$/).first()).toBeVisible();
+      expect(errors).toEqual([]);
+    } finally {
+      await deleteWebsite(request, auth, website.id);
+    }
+  });
+
   test('adds a website and provides its tracking code in settings', async ({ page, request }) => {
     const auth = await loginPage(page, request);
     await page.goto('/websites');

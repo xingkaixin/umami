@@ -161,3 +161,18 @@ concurrently. `pnpm seed-data --days 1` adds demo data to the local database onl
 Schema changes go through `pnpm db:generate`; review the generated SQL, back up
 production data, and apply migrations explicitly before deploying dependent code.
 Do not regenerate the initial migration after it has been used in production.
+
+### Dependency security maintenance
+
+Run `pnpm audit` after dependency updates. The targeted overrides in
+`pnpm-workspace.yaml` keep affected transitive packages above their security
+patch versions without upgrading unrelated application dependencies.
+
+As of 2026-09-19, the remaining moderate advisory is
+[GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99):
+Drizzle Kit 0.31.10 pulls esbuild 0.18.20 through its legacy ESM loader. The
+advisory affects esbuild's development server; this project uses the loader for
+schema tooling and does not call that server. The package is not part of the
+deployed Worker. Keep the finding visible in audit output and revisit it when
+Drizzle Kit replaces the loader. Do not force this old loader onto a newer
+esbuild API solely to suppress the advisory.
