@@ -29,6 +29,12 @@ export interface FilterRecordProps {
   onChange?: (name: string, value: string) => void;
 }
 
+function getSelectedValues(value: string | string[], operator: string) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  return isSearchOperator(operator) ? [value] : value.split(',');
+}
+
 export function FilterRecord({
   websiteId,
   type,
@@ -42,8 +48,8 @@ export function FilterRecord({
   onChange,
 }: FilterRecordProps) {
   const { fields, operators } = useFilters();
-  const initValues = Array.isArray(value) ? value : value ? value.split(',') : [];
-  const [selected, setSelected] = useState<string[]>(initValues);
+  const isSearch = isSearchOperator(operator);
+  const selected = getSelectedValues(value, operator);
   const [search, setSearch] = useState('');
   const { formatValue } = useFormat();
   const { data, isLoading } = useWebsiteValuesQuery({
@@ -53,7 +59,6 @@ export function FilterRecord({
     startDate,
     endDate,
   });
-  const isSearch = isSearchOperator(operator);
   const items = data?.filter(({ value }) => value) || [];
 
   const handleSearch = (value: string) => {
@@ -65,12 +70,10 @@ export function FilterRecord({
   };
 
   const handleSelectValue = (value: string) => {
-    setSelected([value]);
     onChange?.(name, value);
   };
 
   const handleMultiSelectValue = (values: string[]) => {
-    setSelected(values);
     onChange?.(name, values.join(','));
   };
 
@@ -88,13 +91,7 @@ export function FilterRecord({
                 </ListItem>
               ))}
           </Select>
-          {isSearch && (
-            <TextField
-              value={selected[0] || ''}
-              defaultValue={selected[0] || ''}
-              onChange={handleSelectValue}
-            />
-          )}
+          {isSearch && <TextField value={selected[0] || ''} onChange={handleSelectValue} />}
           {!isSearch && (
             <MultiSelect
               value={selected}
