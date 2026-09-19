@@ -75,6 +75,7 @@ export async function POST(request: Request) {
     ...body,
     type: normalizeBoardType(body.type),
     id: uuid(),
+    description: body.description ?? '',
     parameters: body.parameters ?? {},
     userId: !teamId ? auth.user.id : undefined,
   };

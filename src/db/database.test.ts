@@ -188,3 +188,23 @@ it('deletes website data and shares without touching another website', async () 
   expect(await db.select().from(heatmapEvent)).toEqual([]);
   expect(await db.select().from(share)).toEqual([]);
 });
+
+it('creates a board when the optional description is omitted', async () => {
+  const { POST } = await import('@/app/api/boards/route');
+  const { hash, secret } = await import('@/lib/crypto');
+  const { createSecureToken } = await import('@/lib/jwt');
+  const { getBoard } = await import('@/queries/drizzle/board');
+  const userId = crypto.randomUUID();
+  await createUser({ id: userId, username: 'board-owner', password: 'hash', role: 'user' });
+  const token = createSecureToken({ userId, pwd: hash('hash') }, secret());
+  const response = await POST(
+    new Request('http://localhost/api/boards', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Board', type: 'mixed' }),
+    }),
+  );
+  const result = await response.json();
+  expect(response.status).toBe(200);
+  expect(await getBoard(result.id)).toMatchObject({ name: 'Board', description: '' });
+});
