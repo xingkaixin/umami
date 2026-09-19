@@ -37,7 +37,7 @@ export async function POST(
   }
 
   const { reportId } = await params;
-  const { websiteId, type, name, description, parameters } = body;
+  const { type, name, description, parameters } = body;
 
   const report = await getReport(reportId);
 
@@ -50,7 +50,6 @@ export async function POST(
   }
 
   const result = await updateReport(reportId, {
-    websiteId,
     type,
     name,
     description,
