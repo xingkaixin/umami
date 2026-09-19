@@ -4,11 +4,7 @@ import { FIELD_LENGTH } from '@/lib/constants';
 import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { canViewWebsiteSection } from '@/permissions';
-import {
-  getLinkedDistinctIds,
-  getLinkedSessionIds,
-  getSessionActivity,
-} from '@/queries/sql';
+import { getLinkedDistinctIds, getLinkedSessionIds, getSessionActivity } from '@/queries/sql';
 
 export async function GET(
   request: Request,
@@ -41,13 +37,11 @@ export async function GET(
     ? [query.distinctId]
     : await getLinkedDistinctIds(websiteId, sessionId);
 
-  if (distinctIds.length) {
-    const links = await Promise.all(
-      distinctIds.map(distinctId => getLinkedSessionIds(websiteId, distinctId)),
-    );
-    const linkedIds = links.flatMap(group => group.map(link => link.sessionId));
+  if (distinctIds.length === 1) {
+    const links = await getLinkedSessionIds(websiteId, distinctIds[0]);
+    const linkedIds = links.map(link => link.sessionId);
     const linkedDates = links
-      .flatMap(group => group.map(link => +new Date(link.createdAt)))
+      .map(link => +new Date(link.createdAt))
       .filter(timestamp => !Number.isNaN(timestamp));
 
     sessionIds = Array.from(new Set([sessionId, ...linkedIds]));

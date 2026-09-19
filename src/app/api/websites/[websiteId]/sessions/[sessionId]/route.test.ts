@@ -75,6 +75,7 @@ test('GET includes canDelete when relational storage and delete permission are a
     id: 'session-1',
     distinctId: 'distinct-1',
   });
+  getLinkedDistinctIdsMock.mockResolvedValue(['distinct-1']);
   getLinkedSessionIdsMock.mockResolvedValue([
     { sessionId: 'session-2', createdAt: '2026-07-24T00:00:00.000Z' },
   ]);
@@ -144,4 +145,23 @@ test('DELETE removes the session when the request is valid', async () => {
   expect(response.status).toBe(200);
   await expect(response.json()).resolves.toEqual({ ok: true });
   expect(deleteSessionMock).toHaveBeenCalledWith('website-1', 'session-1');
+});
+
+test('GET does not stitch a legacy session with multiple identities', async () => {
+  parseRequestMock.mockResolvedValue({ auth: {}, error: undefined });
+  canViewWebsiteSectionMock.mockResolvedValue(true);
+  canDeleteWebsiteMock.mockResolvedValue(false);
+  getWebsiteSessionMock.mockResolvedValue({ id: 'session-1', distinctId: 'distinct-2' });
+  getLinkedDistinctIdsMock.mockResolvedValue(['distinct-1', 'distinct-2']);
+  getLinkedSessionIdsMock.mockResolvedValue([]);
+  const response = await GET(new Request('http://localhost/api/session'), {
+    params: Promise.resolve({ websiteId: 'website-1', sessionId: 'session-1' }),
+  });
+  const body = await response.json();
+  expect(body).toMatchObject({
+    distinctIds: ['distinct-1', 'distinct-2'],
+    stitchedSessionCount: 1,
+  });
+  expect(body).not.toHaveProperty('distinctId');
+  expect(getLinkedSessionIdsMock).not.toHaveBeenCalled();
 });

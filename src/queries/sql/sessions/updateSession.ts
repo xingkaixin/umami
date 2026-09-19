@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { getDatabase } from '@/db/client';
 import { session } from '@/db/schema';
 import { FIELD_LENGTH } from '@/lib/constants';
@@ -14,5 +14,11 @@ export async function updateSession({ websiteId, sessionId, distinctId }: Update
   await getDatabase()
     .update(session)
     .set({ distinctId: truncateString(distinctId, FIELD_LENGTH.distinctId) })
-    .where(and(eq(session.websiteId, websiteId), eq(session.id, sessionId)));
+    .where(
+      and(
+        eq(session.websiteId, websiteId),
+        eq(session.id, sessionId),
+        or(isNull(session.distinctId), eq(session.distinctId, '')),
+      ),
+    );
 }

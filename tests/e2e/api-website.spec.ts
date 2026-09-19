@@ -159,21 +159,33 @@ test.describe('Website API tests', () => {
     const { cache, sessionId } = await pageview.json();
     expect(sessionId).toBeTruthy();
 
-    for (const collection of [
-      {
+    const purchase = await request.post('/api/send', {
+      headers: { 'x-umami-cache': cache },
+      data: {
         type: 'event',
         payload: { ...payload, name: 'purchase', data: { plan: 'pro', amount: 29.5 } },
       },
-      { type: 'identify', payload: { ...payload, id: 'customer-1', data: { plan: 'pro' } } },
-      { type: 'performance', payload: { ...payload, lcp: 1200, cls: 0.05, ttfb: 250 } },
-    ]) {
-      const response = await request.post('/api/send', {
-        headers: { 'x-umami-cache': cache },
-        data: collection,
-      });
-      expect(response.status()).toBe(200);
-      expect((await response.json()).sessionId).toBe(sessionId);
-    }
+    });
+    expect(purchase.status()).toBe(200);
+    expect((await purchase.json()).sessionId).toBe(sessionId);
+
+    const identify = await request.post('/api/send', {
+      headers: { 'x-umami-cache': cache },
+      data: { type: 'identify', payload: { ...payload, id: 'customer-1', data: { plan: 'pro' } } },
+    });
+    expect(identify.status()).toBe(200);
+    const identified = await identify.json();
+    expect(identified.sessionId).not.toBe(sessionId);
+
+    const performance = await request.post('/api/send', {
+      headers: { 'x-umami-cache': identified.cache },
+      data: {
+        type: 'performance',
+        payload: { ...payload, id: 'customer-1', lcp: 1200, cls: 0.05, ttfb: 250 },
+      },
+    });
+    expect(performance.status()).toBe(200);
+    expect((await performance.json()).sessionId).toBe(identified.sessionId);
 
     const params = { startAt, endAt: Date.now() + 60_000 };
     const stats = await request.get(`/api/websites/${websiteId}/stats`, {
@@ -197,7 +209,7 @@ test.describe('Website API tests', () => {
     expect(data.find(event => event.eventName === 'purchase').hasData).toBeTruthy();
 
     const properties = await request.get(
-      `/api/websites/${websiteId}/sessions/${sessionId}/properties`,
+      `/api/websites/${websiteId}/sessions/${identified.sessionId}/properties`,
       {
         headers: authHeaders(auth),
       },
