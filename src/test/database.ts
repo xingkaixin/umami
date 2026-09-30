@@ -9,7 +9,6 @@ export async function createTestDatabase() {
     workers: [
       {
         config: {
-          type: 'worker',
           name: 'umami-test',
           compatibilityDate: '2026-08-28',
           manifest: {
