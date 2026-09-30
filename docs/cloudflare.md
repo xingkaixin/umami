@@ -168,7 +168,12 @@ Run `pnpm audit` after dependency updates. The targeted overrides in
 `pnpm-workspace.yaml` keep affected transitive packages above their security
 patch versions without upgrading unrelated application dependencies.
 
-As of 2026-09-19, the remaining moderate advisory is
+The 2026-09-30 security update raises the `fast-uri` and `brace-expansion`
+overrides and updates jsdom and the Cloudflare tooling to patched Undici versions.
+The exact Cloudflare releases are exempted from pnpm's minimum release age so
+the security fixes can be installed before the usual waiting period expires.
+
+As of 2026-09-30, the remaining moderate advisory is
 [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99):
 Drizzle Kit 0.31.10 pulls esbuild 0.18.20 through its legacy ESM loader. The
 advisory affects esbuild's development server; this project uses the loader for
