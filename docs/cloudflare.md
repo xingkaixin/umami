@@ -7,6 +7,9 @@ Workers Assets. Drizzle accesses the `DB` D1 binding directly; there is no conne
 pool or database URL. CRUD operations use the Drizzle schema, and analytical queries
 use bound SQLite SQL. Multi-statement writes that must succeed together use D1 batch.
 
+The framework and Cloudflare adapter are pinned to vinext 1.0.0. Deployment uses
+the existing Wrangler JSONC configuration and Cloudflare Vite plugin v1.
+
 This is a self-hosted edition. Do not set `CLOUD_MODE`: that variable belongs to
 Umami's commercial hosted service, not Cloudflare Workers.
 
@@ -168,7 +171,7 @@ Run `pnpm audit` after dependency updates. The targeted overrides in
 `pnpm-workspace.yaml` keep affected transitive packages above their security
 patch versions without upgrading unrelated application dependencies.
 
-The 2026-09-30 security update raises the `fast-uri` and `brace-expansion`
+The 2026-09-30 security update raises the `fast-uri`, `brace-expansion`, and `fflate`
 overrides and updates jsdom and the Cloudflare tooling to patched Undici versions.
 The exact Cloudflare releases are exempted from pnpm's minimum release age so
 the security fixes can be installed before the usual waiting period expires.
