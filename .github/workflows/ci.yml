@@ -32,6 +32,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - name: Prepare local D1 and Worker secrets
+        env:
+          CHOKIDAR_USEPOLLING: 'true'
         run: |
           node --input-type=module <<'JS'
           import { randomBytes } from 'node:crypto';

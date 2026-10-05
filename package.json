@@ -42,7 +42,7 @@
     "deploy:check": "cf deploy --prebuilt --dry-run",
     "check-types": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "cf d1 migrations apply dee22116-3720-47a1-9042-185750498e79 --dir db/d1 --local --persist-to .wrangler/state",
+    "db:migrate:local": "CHOKIDAR_USEPOLLING=true cf d1 migrations apply dee22116-3720-47a1-9042-185750498e79 --dir db/d1 --local --persist-to .wrangler/state",
     "db:migrate:remote": "cf d1 migrations apply dee22116-3720-47a1-9042-185750498e79 --dir db/d1",
     "db:create-admin": "tsx scripts/create-admin.ts"
   },

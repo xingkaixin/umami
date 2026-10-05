@@ -36,7 +36,10 @@ try {
       `@${file}`,
       ...(target === '--local' ? ['--local', '--persist-to', '.wrangler/state'] : []),
     ],
-    { stdio: 'inherit' },
+    {
+      stdio: 'inherit',
+      env: target === '--local' ? { ...process.env, CHOKIDAR_USEPOLLING: 'true' } : process.env,
+    },
   );
   if (result.error) throw result.error;
   if (result.status !== 0) process.exitCode = result.status ?? 1;

@@ -30,6 +30,11 @@ permissions. Back up `worker-secrets.json` securely. The initial password in
 `admin.json` should be replaced after first login, then removed from that file.
 Do not copy the local development database or its test password into production.
 
+Cloudflare Web Analytics auto-injection is disabled for `umami.xingkaixin.me`
+by a zone Configuration Rule with `disable_rum: true`. This overrides the parent
+zone's automatic beacon without changing analytics on other hostnames. The rule
+is managed in Cloudflare, separately from Worker deployments.
+
 ## Local setup
 
 Use Node.js 24, pnpm 11, and the global `cf` installed through mise
@@ -54,6 +59,11 @@ Use `cf d1 raw --sql` for queries: cf 1.0.0-beta.12 does not implement the local
 Miniflare v5 uses a new local storage identity. Existing Wrangler v4 local data is
 left in place; initialize the new local database with the setup commands above.
 Production D1 data is unaffected.
+
+The local CLI scripts and CI database setup set `CHOKIDAR_USEPOLLING=true`.
+cf 1.0.0-beta.12 can leave a Miniflare registry filesystem watcher open after a
+successful local command; polling avoids this shutdown race. Set the same variable
+for manual local cf commands if they do not exit.
 
 There is no default `admin/umami` account. Builds never apply migrations, create
 accounts, or connect to a remote database. Never commit `.dev.vars` or `.wrangler`.
