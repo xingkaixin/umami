@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      WRANGLER_SEND_METRICS: 'false'
+      CF_SEND_TELEMETRY: 'false'
       UMAMI_ADMIN_PASSWORD: umami-ci-test-password
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - uses: jdx/mise-action@v3
+        with:
+          tool_versions: |
+            npm:cf 1.0.0-beta.12
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - name: Prepare local D1 and Worker secrets
@@ -39,8 +43,8 @@ jobs:
           node --input-type=module <<'JS'
           import { execFileSync } from 'node:child_process';
           import { appendFileSync } from 'node:fs';
-          const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'DB', '--local', '--json', '--command', "SELECT user_id AS id FROM user WHERE username = 'admin'"], { encoding: 'utf8' });
-          const id = JSON.parse(output)[0]?.results?.[0]?.id;
+          const output = execFileSync('cf', ['d1', 'raw', 'dee22116-3720-47a1-9042-185750498e79', '--local', '--persist-to', '.wrangler/state', '--sql', "SELECT user_id AS id FROM user WHERE username = 'admin'"], { encoding: 'utf8' });
+          const id = JSON.parse(output)[0]?.results?.rows?.[0]?.[0];
           if (!id) throw new Error('Local test administrator was not created.');
           appendFileSync(process.env.GITHUB_ENV, `UMAMI_USER_ID=${id}\n`);
           JS
