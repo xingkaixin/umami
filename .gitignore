@@ -58,3 +58,4 @@ yarn-error.log*
 !.dev.vars.example
 .wrangler/
 .vinext/
+.cloudflare/

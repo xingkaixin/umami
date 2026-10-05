@@ -8,7 +8,10 @@ pool or database URL. CRUD operations use the Drizzle schema, and analytical que
 use bound SQLite SQL. Multi-statement writes that must succeed together use D1 batch.
 
 The framework and Cloudflare adapter are pinned to vinext 1.0.0. Deployment uses
-the existing Wrangler JSONC configuration and Cloudflare Vite plugin v1.
+the global mise-managed `cf` CLI and Cloudflare Vite plugin v2 beta.
+`cloudflare.config.ts` is the shared configuration. `@cloudflare/config/public`
+provides the same configuration helpers as `cf/config` without installing the CLI
+as a project dependency. Keep its version aligned with the Vite plugin.
 
 This is a self-hosted edition. Do not set `CLOUD_MODE`: that variable belongs to
 Umami's commercial hosted service, not Cloudflare Workers.
@@ -16,10 +19,10 @@ Umami's commercial hosted service, not Cloudflare Workers.
 ## Production instance
 
 This checkout targets `https://umami.xingkaixin.me`, the `umami` Worker, and its
-dedicated `umami` D1 database. `wrangler.jsonc` contains the production account,
+dedicated `umami` D1 database. `cloudflare.config.ts` contains the production account,
 database ID, and Custom Domain. Both `workers.dev` and preview URLs are disabled.
-Commands with `--remote` operate on this production database; local development
-continues to use `.wrangler/state`.
+`pnpm db:migrate:remote` and `pnpm db:create-admin --remote` operate on this
+production database; local development continues to use `.wrangler/state`.
 
 Production secrets and the initial administrator credentials are stored outside
 the repository in `~/.config/umami/umami.xingkaixin.me/`, with owner-only file
@@ -29,7 +32,9 @@ Do not copy the local development database or its test password into production.
 
 ## Local setup
 
-Use Node.js 24 and pnpm 11. Install dependencies with `pnpm install`. The approved
+Use Node.js 24, pnpm 11, and the global `cf` installed through mise
+(`npm:cf`, tested with 1.0.0-beta.12). Do not add `cf` to project dependencies.
+Install dependencies with `pnpm install --frozen-lockfile`. The approved
 `workerd` install script supplies the local Workers runtime.
 
 1. Copy `.dev.vars.example` to `.dev.vars`.
@@ -40,9 +45,15 @@ Use Node.js 24 and pnpm 11. Install dependencies with `pnpm install`. The approv
    `pnpm db:create-admin --local`. `UMAMI_ADMIN_USERNAME` optionally overrides `admin`.
 5. Run `pnpm dev`, or `pnpm build && pnpm start` to preview the production Worker.
 
-The production preview uses the same `.wrangler/state` as local migrations. A
-`--config dist/server/wrangler.json` command without the configured `--persist-to`
-would create a different local database under the build directory.
+The Vite plugin explicitly uses `.wrangler/state` for both development and
+production preview, matching local cf commands. Always pass
+`--local --persist-to .wrangler/state` when querying the local D1 database;
+cf D1 commands default to the remote database and accept database IDs, not bindings.
+Use `cf d1 raw --sql` for queries: cf 1.0.0-beta.12 does not implement the local
+`d1 query` endpoint. The raw response contains `results.columns` and `results.rows`.
+Miniflare v5 uses a new local storage identity. Existing Wrangler v4 local data is
+left in place; initialize the new local database with the setup commands above.
+Production D1 data is unaffected.
 
 There is no default `admin/umami` account. Builds never apply migrations, create
 accounts, or connect to a remote database. Never commit `.dev.vars` or `.wrangler`.
@@ -50,22 +61,26 @@ accounts, or connect to a remote database. Never commit `.dev.vars` or `.wrangle
 ## First deployment
 
 For a separate instance, these commands create resources in your Cloudflare
-account. Check `wrangler whoami` and choose a distinct Worker and database name
+account. Check `cf auth status` and choose a distinct Worker and database name
 before proceeding. Do not repeat initial setup against the existing instance.
 
 ```sh
-pnpm exec wrangler login
-pnpm exec wrangler whoami
-pnpm exec wrangler d1 create umami
+cf login
+cf auth status
+cf d1 create --name umami
 ```
 
-Replace `database_id` in `wrangler.jsonc` with the returned ID, and update `name`,
-`account_id`, and `routes` for the new instance. The binding name stays `DB`.
+Replace the D1 binding `id` in `cloudflare.config.ts` with the returned ID, and
+update the Worker `name`, `accountId`, and Worker `domains` for the new instance.
+The binding name stays `DB`. Update the database ID in the package migration
+scripts and CI query when configuring a separate instance.
 
 Configure stable production secrets. Save them outside this repository; losing
 `TWO_FACTOR_ENCRYPTION_KEY` makes stored authenticator secrets unreadable, and
 changing `APP_SECRET` invalidates signed tokens and changes derived visitor IDs.
-Create a private JSON file containing only these two keys, each with its own
+Both keys are declared with `bindings.secret()` so local `.dev.vars` values are
+loaded by the Vite plugin. Create a private JSON file containing only these two
+keys, each with its own
 value generated by `openssl rand -hex 32`. Never commit this file.
 
 ```sh
@@ -74,15 +89,15 @@ pnpm db:migrate:remote
 pnpm db:create-admin --remote
 pnpm build
 pnpm deploy:check
-pnpm exec wrangler deploy --config dist/server/wrangler.json --secrets-file /absolute/path/worker-secrets.json
+cf deploy --prebuilt --secrets-file /absolute/path/worker-secrets.json
 ```
 
-`deploy:check` bundles the already built Worker without deploying it. `deploy`
-builds and deploys using the vinext Cloudflare CLI. Remote deployment still needs
-valid Cloudflare authorization and a real database ID. This repository does not
+`deploy:check` validates the existing `.cloudflare/output` build without deploying
+it. `deploy` builds the app and deploys the result with `cf deploy --prebuilt`.
+Remote deployment still needs valid Cloudflare authorization and a real database ID. This repository does not
 create remote resources automatically. The first deployment above uploads code
 and secrets together; subsequent `pnpm deploy` runs preserve existing secrets.
-Keep the Custom Domain in `wrangler.jsonc` so future builds retain the binding.
+Keep the Custom Domain in `cloudflare.config.ts` so future builds retain the binding.
 
 After deployment, sign in, create a website, install its tracker, and verify a
 pageview and a custom event in the dashboard. Set up 2FA before exposing an
@@ -173,8 +188,8 @@ patch versions without upgrading unrelated application dependencies.
 
 The 2026-09-30 security update raises the `fast-uri`, `brace-expansion`, and `fflate`
 overrides and updates jsdom and the Cloudflare tooling to patched Undici versions.
-The exact Cloudflare releases are exempted from pnpm's minimum release age so
-the security fixes can be installed before the usual waiting period expires.
+Pinned Cloudflare releases are exempted from pnpm's minimum release age when
+needed for security fixes or the cf beta migration.
 
 As of 2026-09-30, the remaining moderate advisory is
 [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99):

@@ -11,9 +11,8 @@ allowBuilds:
   workerd: true
 minimumReleaseAgeExclude:
   - '@umami/react-zen'
-  - '@cloudflare/vite-plugin@1.62.2'
+  - '@cloudflare/vite-plugin@2.0.0-beta.sha-52b0dc0e9'
   - miniflare@5.20260926.1-alpha
-  - wrangler@4.144.0
 overrides:
   '@babel/core@<7.29.6': 7.29.6
   'brace-expansion@<1.1.21': 1.1.21

@@ -55,8 +55,8 @@ migration commands share `.wrangler/state`; neither touches a remote database.
 ### Deployment
 
 The configured production instance is [umami.xingkaixin.me](https://umami.xingkaixin.me).
-Its Worker, account, D1 ID, and Custom Domain are recorded in `wrangler.jsonc`.
-Commands using `--remote` target that production database. CI does not deploy.
+Its Worker, account, D1 ID, and Custom Domain are recorded in `cloudflare.config.ts`.
+cf D1 commands target production unless `--local` is specified. CI does not deploy.
 For a new instance or a production update, follow [the deployment guide](docs/cloudflare.md).
 
 ### Compatibility

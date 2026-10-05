@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "npm-run-all check-types build-tracker build-recorder build-app",
-    "start": "wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state",
+    "start": "vite preview --host 127.0.0.1 --strictPort",
     "build-app": "vinext build",
     "build-icons": "svgr ./src/assets --out-dir src/components/svg --typescript",
     "build-components": "node scripts/bump-components.js && tsup",
@@ -38,12 +38,12 @@
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check --write",
-    "deploy": "vinext-cloudflare deploy",
-    "deploy:check": "wrangler deploy --config dist/server/wrangler.json --dry-run",
+    "deploy": "pnpm build && cf deploy --prebuilt",
+    "deploy:check": "cf deploy --prebuilt --dry-run",
     "check-types": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:local": "cf d1 migrations apply dee22116-3720-47a1-9042-185750498e79 --dir db/d1 --local --persist-to .wrangler/state",
+    "db:migrate:remote": "cf d1 migrations apply dee22116-3720-47a1-9042-185750498e79 --dir db/d1",
     "db:create-admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
@@ -107,7 +107,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
-    "@cloudflare/vite-plugin": "1.62.2",
+    "@cloudflare/config": "0.22.0",
+    "@cloudflare/vite-plugin": "2.0.0-beta.sha-52b0dc0e9",
     "@cloudflare/workers-types": "5.20260929.1",
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -139,7 +140,6 @@
     "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.11",
-    "wrangler": "4.144.0"
+    "vitest": "^4.1.11"
   }
 }

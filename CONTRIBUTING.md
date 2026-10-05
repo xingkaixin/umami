@@ -21,7 +21,7 @@ Use Node.js 24 and pnpm 11. Follow [the Cloudflare guide](docs/cloudflare.md) fo
 local setup and browser testing. Browser tests need a dedicated local D1 database.
 CI runs them against the built Worker and never deploys to Cloudflare.
 
-`wrangler.jsonc` contains production resource IDs. Commands with `--remote`
+`cloudflare.config.ts` contains production resource IDs. `pnpm db:migrate:remote` and `pnpm db:create-admin --remote`
 modify the production database; use them only for an intended production change.
 Create new Drizzle migrations for schema changes. Never rewrite a migration that
 has already run in production. Keep database backups before applying changes.

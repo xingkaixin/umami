@@ -2,8 +2,8 @@
 import 'dotenv/config';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
-import { getPlatformProxy } from 'wrangler';
-import type { D1Database } from '@cloudflare/workers-types';
+import { Miniflare } from 'miniflare';
+import cloudflareConfig from '../../cloudflare.config';
 import { insertRows } from '../../src/db/insert';
 import { deleteWebsiteData } from '../../src/db/delete';
 import * as schema from '../../src/db/schema';
@@ -176,11 +176,28 @@ async function generateSiteData(
 }
 
 export async function seed(config: SeedConfig): Promise<SeedResult> {
-  const proxy = await getPlatformProxy<{ DB: D1Database }>({
-    configPath: 'wrangler.jsonc',
-    persist: { path: '.wrangler/state/v3' },
+  const proxy = new Miniflare({
+    workers: [
+      {
+        config: {
+          name: 'umami-seed',
+          compatibilityDate: cloudflareConfig.worker.compatibilityDate,
+          manifest: {
+            mainModule: 'worker.mjs',
+            modules: {
+              'worker.mjs': {
+                type: 'esm',
+                contents: 'export default { fetch() { return new Response(null); } };',
+              },
+            },
+          },
+          env: { DB: cloudflareConfig.worker.env.DB },
+        },
+      },
+    ],
+    resourcePersistencePath: '.wrangler/state/v3',
   });
-  const db = drizzle(proxy.env.DB, { schema });
+  const db = drizzle(await proxy.getD1Database('DB'), { schema });
 
   try {
     const endDate = new Date();

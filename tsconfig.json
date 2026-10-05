@@ -39,5 +39,13 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist", ".wrangler", ".vinext", "./playwright.config.ts", "tests/e2e"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".wrangler",
+    ".cloudflare",
+    ".vinext",
+    "./playwright.config.ts",
+    "tests/e2e"
+  ]
 }

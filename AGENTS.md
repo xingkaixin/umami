@@ -17,7 +17,7 @@
 
 ## 生产环境
 
-- `wrangler.jsonc` 指向 `umami.xingkaixin.me` 的生产资源。`--remote` 操作会影响生产库。
+- `cloudflare.config.ts` 指向 `umami.xingkaixin.me` 的生产资源。cf D1 命令默认操作生产库，本地操作必须带 `--local --persist-to .wrangler/state`。
 - 未明确要求部署或修改线上数据时，只做本地验证。CI 不自动部署。
 - 数据库结构变更使用新的 Drizzle 迁移；已在生产执行的迁移不可重写。
 - 不提交 `.dev.vars`、`.wrangler`、构建产物、密码或生产密钥，也不要将它们输出到日志。

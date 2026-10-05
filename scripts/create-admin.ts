@@ -1,8 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import config from '../cloudflare.config';
 import { hashPassword } from '../src/lib/password';
 
 const target = process.argv[2];
@@ -14,18 +15,27 @@ if (!password || password.length < 12)
   throw new Error('Set UMAMI_ADMIN_PASSWORD to at least 12 characters.');
 if (!username || username.length > 255) throw new Error('Invalid administrator username.');
 const id = randomUUID();
-const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 const directory = await mkdtemp(join(tmpdir(), 'umami-admin-'));
 try {
-  const file = join(directory, 'admin.sql');
+  const file = join(directory, 'admin.json');
   await writeFile(
     file,
-    `insert into user (user_id, username, password, role) values (${quote(id)}, ${quote(username)}, ${quote(hashPassword(password))}, 'admin');`,
+    JSON.stringify({
+      sql: "insert into user (user_id, username, password, role) values (?, ?, ?, 'admin')",
+      params: [id, username, hashPassword(password)],
+    }),
     { mode: 0o600 },
   );
   const result = spawnSync(
-    'pnpm',
-    ['exec', 'wrangler', 'd1', 'execute', 'DB', target, '--file', file],
+    'cf',
+    [
+      'd1',
+      'raw',
+      config.worker.env.DB.id,
+      '--body',
+      `@${file}`,
+      ...(target === '--local' ? ['--local', '--persist-to', '.wrangler/state'] : []),
+    ],
     { stdio: 'inherit' },
   );
   if (result.error) throw result.error;
