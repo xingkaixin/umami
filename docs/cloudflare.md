@@ -7,7 +7,7 @@ Workers Assets. Drizzle accesses the `DB` D1 binding directly; there is no conne
 pool or database URL. CRUD operations use the Drizzle schema, and analytical queries
 use bound SQLite SQL. Multi-statement writes that must succeed together use D1 batch.
 
-The framework and Cloudflare adapter are pinned to vinext 1.0.0. Deployment uses
+The framework and Cloudflare adapter are pinned to vinext 1.3.0. Deployment uses
 the global mise-managed `cf` CLI and Cloudflare Vite plugin v2 beta.
 `cloudflare.config.ts` is the shared configuration. `@cloudflare/config/public`
 provides the same configuration helpers as `cf/config` without installing the CLI
