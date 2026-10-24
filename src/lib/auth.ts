@@ -9,6 +9,7 @@ import {
 import { hash, secret } from '@/lib/crypto';
 import { parseSecureToken, parseToken } from '@/lib/jwt';
 import { ensureArray } from '@/lib/utils';
+import { getShare } from '@/queries/drizzle/share';
 import { getUser } from '@/queries/drizzle/user';
 
 const log = debug('umami:auth');
@@ -73,18 +74,28 @@ export async function hasPermission(role: string, permission: string | string[])
   return ensureArray(permission).some(e => ROLE_PERMISSIONS[role]?.includes(e));
 }
 
-export function parseShareToken(request: Request) {
+export async function parseShareToken(request: Request) {
   try {
     const token: any = parseToken(request.headers.get(SHARE_TOKEN_HEADER), secret());
 
     // Only accept tokens explicitly minted as share tokens. This prevents other
     // tokens signed with the same secret (e.g. the cache token from /api/send)
     // from being replayed as share tokens to gain analytics access.
-    if (token?.type !== SHARE_TOKEN_TYPE) {
+    if (token?.type !== SHARE_TOKEN_TYPE || !token.shareId) {
       return null;
     }
 
-    return token;
+    // Share tokens never expire, so revocation and section changes are read from
+    // the live share record on every request.
+    const share = await getShare(token.shareId);
+    const entityId = token.boardId ?? token.websiteId;
+
+    if (!share || share.shareType !== token.shareType || share.entityId !== entityId) {
+      log('Share token rejected: share not found');
+      return null;
+    }
+
+    return { ...token, parameters: share.parameters };
   } catch (e) {
     log(e);
     return null;

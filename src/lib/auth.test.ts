@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { hash } from '@/lib/crypto';
-import { parseSecureToken } from '@/lib/jwt';
+import { SHARE_TOKEN_HEADER, SHARE_TOKEN_TYPE } from '@/lib/constants';
+import { parseSecureToken, parseToken } from '@/lib/jwt';
+import { getShare } from '@/queries/drizzle/share';
 import { getUser } from '@/queries/drizzle/user';
-import { checkAuth } from './auth';
+import { checkAuth, parseShareToken } from './auth';
 
 vi.mock('@/lib/jwt', () => ({
   parseSecureToken: vi.fn(),
   parseToken: vi.fn(() => null),
+}));
+
+vi.mock('@/queries/drizzle/share', () => ({
+  getShare: vi.fn(),
 }));
 
 vi.mock('@/queries/drizzle/user', () => ({
@@ -104,4 +110,55 @@ test('does not authorize a partial 2FA token as a completed login', async () => 
   const result = await checkAuth(authedRequest());
   console.info('Partial authentication accepted:', Boolean(result?.user));
   expect(result).toBeNull();
+});
+
+describe('parseShareToken', () => {
+  const token = {
+    type: SHARE_TOKEN_TYPE,
+    shareId: 'share-1',
+    shareType: 1,
+    websiteId: 'website-1',
+    parameters: { overview: true, events: true },
+  };
+
+  function shareRequest() {
+    return new Request('http://localhost/api/test', {
+      headers: { [SHARE_TOKEN_HEADER]: 'share-token' },
+    });
+  }
+
+  beforeEach(() => {
+    vi.mocked(parseToken).mockReturnValue(token as any);
+  });
+
+  test('rejects a token whose share was deleted', async () => {
+    vi.mocked(getShare).mockResolvedValue(null);
+
+    expect(await parseShareToken(shareRequest())).toBeNull();
+  });
+
+  test('rejects a token whose share now points to another entity', async () => {
+    vi.mocked(getShare).mockResolvedValue({
+      id: 'share-1',
+      shareType: 1,
+      entityId: 'website-2',
+      parameters: {},
+    } as any);
+
+    expect(await parseShareToken(shareRequest())).toBeNull();
+  });
+
+  test('uses the current share parameters', async () => {
+    vi.mocked(getShare).mockResolvedValue({
+      id: 'share-1',
+      shareType: 1,
+      entityId: 'website-1',
+      parameters: { overview: true },
+    } as any);
+
+    expect(await parseShareToken(shareRequest())).toMatchObject({
+      websiteId: 'website-1',
+      parameters: { overview: true },
+    });
+  });
 });
