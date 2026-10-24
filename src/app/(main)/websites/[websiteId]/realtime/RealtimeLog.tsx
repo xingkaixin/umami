@@ -1,5 +1,5 @@
 import { Column, Heading, Row, SearchField, Text } from '@umami/react-zen';
-import { useMemo, useState } from 'react';
+import { type CSSProperties, type ReactElement, useMemo, useState } from 'react';
 import { List, type RowComponentProps } from 'react-window';
 import { SessionModal } from '@/app/(main)/websites/[websiteId]/sessions/SessionModal';
 import { Avatar } from '@/components/common/Avatar';
@@ -123,7 +123,7 @@ export function RealtimeLog({ data }: { data: any }) {
     }
   };
 
-  const TableRow = ({ index, style, logs }: RowComponentProps<{ logs: any[] }>) => {
+  const renderRow = (index: number, style: CSSProperties) => {
     const row = logs[index];
     return (
       <Row alignItems="center" style={{ ...style, minWidth: 0 }} gap>
@@ -208,10 +208,10 @@ export function RealtimeLog({ data }: { data: any }) {
         {logs?.length === 0 && <Empty />}
         {logs.length > 0 && (
           <List
-            rowComponent={TableRow}
+            rowComponent={LogRow}
             rowCount={logs.length}
             rowHeight={ROW_HEIGHT}
-            rowProps={{ logs }}
+            rowProps={{ renderRow }}
             defaultHeight={listHeight}
             style={{ width: '100%', height: listHeight }}
           />
@@ -220,4 +220,12 @@ export function RealtimeLog({ data }: { data: any }) {
       <SessionModal websiteId={website.id} />
     </Column>
   );
+}
+
+function LogRow({
+  index,
+  style,
+  renderRow,
+}: RowComponentProps<{ renderRow: (index: number, style: CSSProperties) => ReactElement }>) {
+  return renderRow(index, style);
 }

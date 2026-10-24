@@ -63,27 +63,6 @@ export function Attribution({
       ]
     : [];
 
-  function AttributionTable({ data = [], title }: { data: any; title: string }) {
-    const attributionData = percentFilter(
-      data.map(({ name, value }) => ({
-        x: name,
-        y: Number(value),
-      })),
-    );
-
-    return (
-      <ListTable
-        title={title}
-        metric={t(labels.visitors)}
-        data={attributionData.map(({ x, y, z }: { x: string; y: number; z: number }) => ({
-          label: x,
-          count: y,
-          percent: z,
-        }))}
-      />
-    );
-  }
-
   return (
     <LoadingPanel data={data} isLoading={isLoading} error={error}>
       {data && (
@@ -98,32 +77,89 @@ export function Attribution({
           <SectionHeader title={t(labels.sources)} />
           <Grid columns={{ base: '1fr', md: '1fr 1fr' }} gap>
             <Panel>
-              <AttributionTable data={data?.referrer} title={t(labels.referrer)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.referrer}
+                title={t(labels.referrer)}
+              />
             </Panel>
             <Panel>
-              <AttributionTable data={data?.paidAds} title={t(labels.paidAds)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.paidAds}
+                title={t(labels.paidAds)}
+              />
             </Panel>
           </Grid>
           <SectionHeader title="UTM" />
           <Grid columns={{ base: '1fr', md: '1fr 1fr' }} gap>
             <Panel>
-              <AttributionTable data={data?.utm_source} title={t(labels.sources)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.utm_source}
+                title={t(labels.sources)}
+              />
             </Panel>
             <Panel>
-              <AttributionTable data={data?.utm_medium} title={t(labels.medium)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.utm_medium}
+                title={t(labels.medium)}
+              />
             </Panel>
             <Panel>
-              <AttributionTable data={data?.utm_cmapaign} title={t(labels.campaigns)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.utm_cmapaign}
+                title={t(labels.campaigns)}
+              />
             </Panel>
             <Panel>
-              <AttributionTable data={data?.utm_content} title={t(labels.content)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.utm_content}
+                title={t(labels.content)}
+              />
             </Panel>
             <Panel>
-              <AttributionTable data={data?.utm_term} title={t(labels.terms)} />
+              <AttributionTable
+                metric={t(labels.visitors)}
+                data={data?.utm_term}
+                title={t(labels.terms)}
+              />
             </Panel>
           </Grid>
         </Column>
       )}
     </LoadingPanel>
+  );
+}
+
+function AttributionTable({
+  data = [],
+  title,
+  metric,
+}: {
+  data: any;
+  title: string;
+  metric: string;
+}) {
+  const attributionData = percentFilter(
+    data.map(({ name, value }) => ({
+      x: name,
+      y: Number(value),
+    })),
+  );
+
+  return (
+    <ListTable
+      title={title}
+      metric={metric}
+      data={attributionData.map(({ x, y, z }: { x: string; y: number; z: number }) => ({
+        label: x,
+        count: y,
+        percent: z,
+      }))}
+    />
   );
 }

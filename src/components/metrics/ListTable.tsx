@@ -62,10 +62,6 @@ export function ListTable({
     );
   };
 
-  const ListTableRow = ({ index, style }: RowComponentProps) => {
-    return <div style={style}>{getRow(data[index], index)}</div>;
-  };
-
   return (
     <Column gap>
       <Grid
@@ -87,8 +83,8 @@ export function ListTable({
             defaultHeight={itemCount * ITEM_SIZE}
             rowCount={data.length}
             rowHeight={ITEM_SIZE}
-            rowComponent={ListTableRow}
-            rowProps={{}}
+            rowComponent={VirtualRow}
+            rowProps={{ renderRow: index => getRow(data[index], index) }}
           />
         ) : (
           data.map(getRow)
@@ -96,6 +92,14 @@ export function ListTable({
       </Column>
     </Column>
   );
+}
+
+function VirtualRow({
+  index,
+  style,
+  renderRow,
+}: RowComponentProps<{ renderRow: (index: number) => ReactNode }>) {
+  return <div style={style}>{renderRow(index)}</div>;
 }
 
 const AnimatedRow = ({
