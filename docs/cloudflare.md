@@ -198,10 +198,12 @@ patch versions without upgrading unrelated application dependencies.
 
 The 2026-09-30 security update raises the `fast-uri`, `brace-expansion`, and `fflate`
 overrides and updates jsdom and the Cloudflare tooling to patched Undici versions.
+The 2026-10-24 update adds overrides for `postcss-selector-parser`, `serialize-javascript`,
+`shell-quote`, `source-map-js`, `undici`, and `zod`, and raises `fast-uri` and `sharp`.
 Pinned Cloudflare releases are exempted from pnpm's minimum release age when
 needed for security fixes or the cf beta migration.
 
-As of 2026-09-30, the remaining moderate advisory is
+As of 2026-10-24, the remaining moderate advisory is
 [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99):
 Drizzle Kit 0.31.10 pulls esbuild 0.18.20 through its legacy ESM loader. The
 advisory affects esbuild's development server; this project uses the loader for
