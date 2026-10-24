@@ -91,6 +91,15 @@ test('keeps repeated filters and event/session property names independent', asyn
   ).toEqual([{ x: '2026-03-08T00:00:00Z', y: 1 }]);
 });
 
+test('keeps missing values in negative filters', async () => {
+  await record('2026-03-08T06:30:00Z');
+  for (const referrer of ['neq.example.com', 'dnc.example', 'nre.^example']) {
+    expect(await getPageviewStats(websiteId, { startDate, endDate, referrer })).toEqual([
+      { x: '2026-03-08T00:00:00Z', y: 1 },
+    ]);
+  }
+});
+
 test('applies regex filters to older sessions active in the selected period', async () => {
   await createSession({
     id: sessionId,

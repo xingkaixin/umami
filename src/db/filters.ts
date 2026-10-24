@@ -34,15 +34,20 @@ async function textCondition(
       scope,
       propertyName,
     );
-    const not = operator === OPERATORS.notRegex ? 'not ' : '';
-    return `${column} is not null and ${column} ${not}in (select value from json_each({{${key}}}))`;
+    return operator === OPERATORS.notRegex
+      ? `coalesce(${column}, '') not in (select value from json_each({{${key}}}))`
+      : `${column} is not null and ${column} in (select value from json_each({{${key}}}))`;
   }
   if (equality.includes(operator as (typeof equality)[number])) {
     params[key] = Array.isArray(value) ? value : [value];
-    return `${column} ${operator === OPERATORS.notEquals ? 'not ' : ''}in (select value from json_each({{${key}}}))`;
+    return operator === OPERATORS.notEquals
+      ? `coalesce(${column}, '') not in (select value from json_each({{${key}}}))`
+      : `${column} in (select value from json_each({{${key}}}))`;
   }
   params[key] = `%${value}%`;
-  return `lower(${column}) ${operator === OPERATORS.doesNotContain ? 'not ' : ''}like lower({{${key}}})`;
+  return operator === OPERATORS.doesNotContain
+    ? `lower(coalesce(${column}, '')) not like lower({{${key}}})`
+    : `lower(${column}) like lower({{${key}}})`;
 }
 
 export async function getColumnFilters(
