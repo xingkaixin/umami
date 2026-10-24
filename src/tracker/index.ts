@@ -346,7 +346,8 @@ type MetricEntry = PerformanceEntry & {
       }
     };
     const onClick = (e: MouseEvent) => {
-      const el = e.target as Element;
+      const el = e.target as Element | null;
+      if (!el || typeof el.closest !== 'function') return;
       const eventEl = el.closest(`[${eventNameAttribute}]`);
       if (!eventEl) return;
 
@@ -377,6 +378,7 @@ type MetricEntry = PerformanceEntry & {
     disabled ||
     !website ||
     localStorage?.getItem('umami.disabled') ||
+    (window.name === 'umami.disabled' && top !== window) ||
     (domain && !domains.includes(hostname)) ||
     (dnt && hasDoNotTrack());
 

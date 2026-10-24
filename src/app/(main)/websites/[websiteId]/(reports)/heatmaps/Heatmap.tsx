@@ -1045,6 +1045,7 @@ function IframeSnapshot({
         className={`${styles.snapshotIframe} rr-block`}
         src={iframeUrl}
         title={iframeUrl}
+        name="umami.disabled"
         tabIndex={-1}
         loading="lazy"
         scrolling="no"
