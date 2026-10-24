@@ -6,6 +6,10 @@
   --overlay-scrollbar-vertical-margin-right: 2px;
 }
 
+.collapsed > [data-orientation] {
+  display: none;
+}
+
 .root > :first-child {
   padding-right: var(--overlay-scrollbar-viewport-padding-right);
 }
@@ -44,7 +48,7 @@
   content: "";
 }
 
-[data-theme='dark'] .root {
+[data-theme="dark"] .root {
   --overlay-scrollbar-track: var(--zen-palette-800);
   --overlay-scrollbar-thumb: var(--zen-palette-600);
   --overlay-scrollbar-thumb-hover: var(--zen-palette-500);
