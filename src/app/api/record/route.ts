@@ -1,7 +1,7 @@
 import { isbot } from 'isbot';
 import { serializeError } from 'serialize-error';
 import { z } from 'zod';
-import { HEATMAP_EVENT_TYPE } from '@/lib/constants';
+import { CACHE_TOKEN_TYPE, HEATMAP_EVENT_TYPE } from '@/lib/constants';
 import { corsPreflight, withCorsHeaders } from '@/lib/cors';
 import { secret } from '@/lib/crypto';
 import { getClientInfo, hasBlockedIp } from '@/lib/detect';
@@ -15,6 +15,8 @@ import { saveRecording } from '@/queries/sql';
 import { saveHeatmapEvents } from '@/queries/sql/heatmap/saveHeatmapEvents';
 
 interface Cache {
+  type?: string;
+  websiteId?: string;
   sessionId: string;
   visitId: string;
 }
@@ -137,7 +139,12 @@ export async function POST(request: Request) {
 
     const cache = (await parseToken(cacheHeader, secret())) as Cache | null;
 
-    if (!cache?.sessionId || !cache?.visitId) {
+    if (
+      cache?.type !== CACHE_TOKEN_TYPE ||
+      cache.websiteId !== websiteId ||
+      !cache.sessionId ||
+      !cache.visitId
+    ) {
       return withCorsHeaders(badRequest({ message: 'Invalid session token.' }));
     }
 
