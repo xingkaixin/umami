@@ -61,7 +61,8 @@ export function TopNav() {
                 teamId={teamId}
                 onChange={handleWebsiteChange}
                 buttonProps={{
-                  variant: 'quiet',
+                  className:
+                    'border-transparent bg-transparent shadow-none hover:border-transparent hover:bg-interactive active:bg-interactive-hover',
                   style: { minHeight: 40, minWidth: 200, maxWidth: 200 },
                 }}
               />
@@ -72,7 +73,8 @@ export function TopNav() {
                 teamId={teamId}
                 onChange={handleLinkChange}
                 buttonProps={{
-                  variant: 'quiet',
+                  className:
+                    'border-transparent bg-transparent shadow-none hover:border-transparent hover:bg-interactive active:bg-interactive-hover',
                   style: { minHeight: 40, minWidth: 200, maxWidth: 200 },
                 }}
               />
@@ -83,7 +85,8 @@ export function TopNav() {
                 teamId={teamId}
                 onChange={handlePixelChange}
                 buttonProps={{
-                  variant: 'quiet',
+                  className:
+                    'border-transparent bg-transparent shadow-none hover:border-transparent hover:bg-interactive active:bg-interactive-hover',
                   style: { minHeight: 40, minWidth: 200, maxWidth: 200 },
                 }}
               />
@@ -94,7 +97,8 @@ export function TopNav() {
                 teamId={teamId}
                 onChange={handleBoardChange}
                 buttonProps={{
-                  variant: 'quiet',
+                  className:
+                    'border-transparent bg-transparent shadow-none hover:border-transparent hover:bg-interactive active:bg-interactive-hover',
                   style: { minHeight: 40, minWidth: 200, maxWidth: 200 },
                 }}
               />
@@ -109,7 +113,7 @@ export function TopNav() {
           left: 0,
           right: 0,
           height: 16,
-          background: 'linear-gradient(to bottom, var(--surface-raised), transparent)',
+          background: 'linear-gradient(to bottom, var(--zen-surface-raised), transparent)',
           pointerEvents: 'none',
         }}
       />

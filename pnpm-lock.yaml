@@ -51,8 +51,8 @@ importers:
         specifier: ^5.104.5
         version: 5.104.5(@types/react@19.3.0)(react@19.3.1)
       '@umami/react-zen':
-        specifier: ^0.249.0
-        version: 0.249.0(@date-fns/tz@1.5.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(immer@11.2.9)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.1.18)(use-sync-external-store@1.7.0(react@19.3.1))
+        specifier: ^0.255.0
+        version: 0.255.0(@date-fns/tz@1.5.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(immer@11.2.9)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.1.18)(use-sync-external-store@1.7.0(react@19.3.1))
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3
@@ -2928,8 +2928,8 @@ packages:
   '@types/yargs@17.0.35':
     resolution: {integrity: sha512-qUHkeCyQFxMXg79wQfTtfndEC+N9ZZg76HJftDJp+qH2tV7Gj4OJi7l+PiWwJ+pWtW8GwSmqsDj/oymhrTWXjg==}
 
-  '@umami/react-zen@0.249.0':
-    resolution: {integrity: sha512-we6zRX96Md5IlKDaSYw2VvHsCJazL95DQehGFBl/O7v1znMi0sAJ4vD1EHdjkb9+avhmTkNp1w45m615bD0bFg==}
+  '@umami/react-zen@0.255.0':
+    resolution: {integrity: sha512-5GEp0CqHENc2DszNvjojxRx7xoEgTrJC2QJqcjVrJ9osEp7cM35jY9eRhxPasY7a63Rgcf7cgQ78df7Kfx1J1g==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -3344,15 +3344,16 @@ packages:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
 
-  clsx@2.1.1:
-    resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
-    engines: {node: '>=6'}
-
   cmdk@1.1.1:
     resolution: {integrity: sha512-Vsv7kFaXm+ptHDMZ7izaRsP70GgrW9NBNGswt9OZaVBLlE0SNpDq8eu/VGXyF9r7M0azK3Wy7OlYXsuyYLFzHg==}
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
       react-dom: ^18 || ^19 || ^19.0.0-rc
+
+  cn@0.2.6:
+    resolution: {integrity: sha512-+i4L0zUGgRcEnhsxueVrP7iBGxBx5iD0WOTYg1MwFEu2ZyCmH5Ov2V1cul2Ht5UchRQQgftCf4be/RxspuW6QQ==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   color-convert@1.9.3:
     resolution: {integrity: sha512-QfAUtd+vFdAtFQcC8CCyYt1fYWxSqAiK2cSD6zDB8N3cpsEBAvRxp9zOGg6G/SHHJYAT88/az/IuDGALsNVbGg==}
@@ -8323,12 +8324,12 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@umami/react-zen@0.249.0(@date-fns/tz@1.5.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(immer@11.2.9)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.1.18)(use-sync-external-store@1.7.0(react@19.3.1))':
+  '@umami/react-zen@0.255.0(@date-fns/tz@1.5.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(date-fns@4.4.0)(immer@11.2.9)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.1.18)(use-sync-external-store@1.7.0(react@19.3.1))':
     dependencies:
       '@base-ui/react': 1.9.0(@date-fns/tz@1.5.0)(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@react-spring/web': 9.7.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      clsx: 2.1.1
       cmdk: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      cn: 0.2.6
       embla-carousel-react: 8.6.0(react@19.3.1)
       lucide-react: 0.555.0(react@19.3.1)
       react: 19.3.1
@@ -8755,8 +8756,6 @@ snapshots:
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
 
-  clsx@2.1.1: {}
-
   cmdk@1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.3.0)(react@19.3.1)
@@ -8768,6 +8767,8 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
+
+  cn@0.2.6: {}
 
   color-convert@1.9.3:
     dependencies:
