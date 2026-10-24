@@ -165,3 +165,20 @@ test('GET does not stitch a legacy session with multiple identities', async () =
   expect(body).not.toHaveProperty('distinctId');
   expect(getLinkedSessionIdsMock).not.toHaveBeenCalled();
 });
+
+test('GET requires the sessions share section', async () => {
+  const auth = { shareToken: { websiteId: 'website-1', parameters: { events: true } } };
+  parseRequestMock.mockResolvedValue({ auth, error: undefined } as any);
+  canViewWebsiteSectionMock.mockResolvedValue(false);
+
+  const response = await GET(
+    new Request('http://localhost/api/websites/website-1/sessions/session-1'),
+    {
+      params: Promise.resolve({ websiteId: 'website-1', sessionId: 'session-1' }),
+    },
+  );
+
+  expect(response.status).toBe(401);
+  expect(canViewWebsiteSectionMock).toHaveBeenCalledWith(auth, 'website-1', 'sessions');
+  expect(getWebsiteSessionMock).not.toHaveBeenCalled();
+});
