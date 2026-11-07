@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { checkAuth } from '@/lib/auth';
 import { DEFAULT_PAGE_SIZE, FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
-import { getAllowedUnits, getMinimumUnit, maxDate, parseDateRange } from '@/lib/date';
+import {
+  getAllowedUnits,
+  getMinimumUnit,
+  getPeriodDateRange,
+  maxDate,
+  parseDateRange,
+} from '@/lib/date';
 import { fetchWebsite } from '@/lib/load';
 import {
   filtersArrayToObject,
@@ -88,6 +94,17 @@ export function getRequestDateRange(query: Record<string, string>) {
   };
 }
 
+export function resolvePeriodDateRange(params: Record<string, any>, now = new Date()) {
+  if (!params.period) {
+    return params;
+  }
+
+  const timezone = params.timezone || 'UTC';
+  const { startDate, endDate } = getPeriodDateRange(params.period, timezone, now);
+
+  return { ...params, startAt: +startDate, endAt: +endDate, timezone };
+}
+
 export function getRequestFilters(query: Record<string, any>) {
   const result: Record<string, any> = {};
 
@@ -114,7 +131,7 @@ export async function getQueryFilters(
   params: Record<string, any>,
   websiteId?: string,
 ): Promise<QueryFilters> {
-  const dateRange = getRequestDateRange(params);
+  const dateRange = getRequestDateRange(resolvePeriodDateRange(params));
   const filters = getRequestFilters(params);
   const eventPropertyFilters = parseUniversalEventPropertyFilters(params);
   const sessionPropertyFilters = parseSessionPropertyFilters(params);

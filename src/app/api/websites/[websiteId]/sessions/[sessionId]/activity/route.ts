@@ -1,8 +1,9 @@
 import { endOfMonth, startOfMonth } from 'date-fns';
 import { z } from 'zod';
 import { FIELD_LENGTH } from '@/lib/constants';
-import { getQueryFilters, parseRequest } from '@/lib/request';
+import { getQueryFilters, parseRequest, resolvePeriodDateRange } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
+import { withPeriodDateRange } from '@/lib/schema';
 import { canViewWebsiteSection } from '@/permissions';
 import { getLinkedDistinctIds, getLinkedSessionIds, getSessionActivity } from '@/queries/sql';
 
@@ -10,7 +11,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ websiteId: string; sessionId: string }> },
 ) {
-  const schema = z.object({
+  const schema = withPeriodDateRange({
     startAt: z.coerce.number().int(),
     endAt: z.coerce.number().int(),
     distinctId: z.string().max(FIELD_LENGTH.distinctId).optional(),
@@ -29,8 +30,9 @@ export async function GET(
   }
 
   let sessionIds = [sessionId];
-  let startAt = query.startAt;
-  let endAt = query.endAt;
+  const dateParams = resolvePeriodDateRange(query);
+  let startAt = dateParams.startAt;
+  let endAt = dateParams.endAt;
   const distinctIds = query.distinctId
     ? [query.distinctId]
     : await getLinkedDistinctIds(websiteId, sessionId);
@@ -50,7 +52,7 @@ export async function GET(
     }
   }
 
-  const filters = await getQueryFilters({ ...query, startAt, endAt }, websiteId);
+  const filters = await getQueryFilters({ ...dateParams, startAt, endAt }, websiteId);
 
   const data = await getSessionActivity(websiteId, sessionIds, filters);
 

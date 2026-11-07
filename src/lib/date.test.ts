@@ -30,6 +30,7 @@ import {
   getMinimumUnit,
   getMonthDateRangeValue,
   getOffsetDateRange,
+  getPeriodDateRange,
   getTimezone,
   isInvalidDate,
   isValidTimezone,
@@ -84,6 +85,28 @@ describe('parseDateValue', () => {
     // optional chaining and yield null.
     expect(parseDateValue(123 as any)).toBeNull();
     expect(parseDateValue({} as any)).toBeNull();
+  });
+});
+
+describe('getPeriodDateRange', () => {
+  test('resolves rolling periods from now', () => {
+    expect(getPeriodDateRange('24h', 'UTC', NOW)).toEqual({
+      startDate: subHours(NOW, 24),
+      endDate: NOW,
+    });
+  });
+
+  test('resolves calendar periods in the timezone', () => {
+    const now = new Date('2026-07-24T12:00:00.000Z');
+
+    expect(getPeriodDateRange('today', 'America/Los_Angeles', now)).toEqual({
+      startDate: new Date('2026-07-24T07:00:00.000Z'),
+      endDate: new Date('2026-07-25T06:59:59.999Z'),
+    });
+    expect(getPeriodDateRange('0month', 'America/Los_Angeles', now)).toEqual({
+      startDate: new Date('2026-07-01T07:00:00.000Z'),
+      endDate: new Date('2026-08-01T06:59:59.999Z'),
+    });
   });
 });
 

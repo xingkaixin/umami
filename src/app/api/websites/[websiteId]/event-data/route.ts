@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
-import { filterParams, pagingParams } from '@/lib/schema';
+import { filterParams, pagingParams, withPeriodDateRange } from '@/lib/schema';
 import { canViewWebsiteSectionRows } from '@/permissions';
 import { getEventData } from '@/queries/sql/events/getEventData';
 
@@ -9,7 +9,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ websiteId: string }> },
 ) {
-  const schema = z.object({
+  const schema = withPeriodDateRange({
     startAt: z.coerce.number().int(),
     endAt: z.coerce.number().int(),
     ...filterParams,

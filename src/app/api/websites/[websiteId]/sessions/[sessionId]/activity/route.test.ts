@@ -8,6 +8,7 @@ import { GET } from './route';
 vi.mock('@/lib/request', () => ({
   getQueryFilters: vi.fn(),
   parseRequest: vi.fn(),
+  resolvePeriodDateRange: (params: Record<string, unknown>) => params,
 }));
 
 vi.mock('@/permissions', () => ({

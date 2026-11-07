@@ -16,6 +16,7 @@ import {
   urlOrPathParam,
   userRoleParam,
   withDateRange,
+  withPeriodDateRange,
 } from './schema';
 
 const UUID = '11111111-1111-4111-8111-111111111111';
@@ -60,10 +61,38 @@ describe('withDateRange', () => {
     expect(() => schema.parse({ startAt: 5 })).toThrow();
   });
 
+  test('accepts a period and rejects combining it with a range', () => {
+    expect(schema.parse({ period: '24hour' }).period).toBe('24hour');
+    expect(() => schema.parse({ period: 'all' })).toThrow();
+    expect(() => schema.parse({ period: 'today', startAt: 5, endAt: 10 })).toThrow();
+  });
+
   test('merges an additional shape into the schema', () => {
     const extended = withDateRange({ websiteId: z.uuid() });
     const result = extended.parse({ startAt: 1, endAt: 2, websiteId: UUID });
     expect(result.websiteId).toBe(UUID);
+  });
+});
+
+describe('withPeriodDateRange', () => {
+  const schema = withPeriodDateRange({
+    startAt: z.coerce.number().int(),
+    endAt: z.coerce.number().int(),
+  });
+
+  test('accepts either a timestamp range or a period', () => {
+    expect(schema.parse({ startAt: '5', endAt: '10' })).toMatchObject({ startAt: 5, endAt: 10 });
+    expect(schema.parse({ period: '7d' }).period).toBe('7d');
+  });
+
+  test('rejects missing, partial and ambiguous ranges', () => {
+    expect(() => schema.parse({})).toThrow();
+    expect(() => schema.parse({ startAt: 5 })).toThrow();
+    expect(() => schema.parse({ period: 'today', startAt: 5, endAt: 10 })).toThrow();
+  });
+
+  test('allows omitting the range when not required', () => {
+    expect(withPeriodDateRange({}, false).parse({})).toEqual({});
   });
 });
 

@@ -2,20 +2,26 @@ import { z } from 'zod';
 import { fromZonedTime } from 'date-fns-tz';
 import { parseDateRange } from '@/lib/date';
 import { canViewBatchWebsites } from '@/permissions/website';
-import { parseRequest } from '@/lib/request';
+import { parseRequest, resolvePeriodDateRange } from '@/lib/request';
 import { json } from '@/lib/response';
-import { timezoneParam } from '@/lib/schema';
+import { timezoneParam, withPeriodDateRange } from '@/lib/schema';
 import { getWebsiteListCharts } from '@/queries/sql';
 
-const schema = z.object({
-  ids: z
-    .string()
-    .transform(value => value.split(',').map(item => item.trim()).filter(Boolean))
-    .pipe(z.array(z.uuid()).min(1).max(20)),
-  startAt: z.coerce.number().int().optional(),
-  endAt: z.coerce.number().int().optional(),
-  timezone: timezoneParam.optional(),
-});
+const schema = withPeriodDateRange(
+  {
+    ids: z
+      .string()
+      .transform(value =>
+        value
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.uuid()).min(1).max(20)),
+    timezone: timezoneParam.optional(),
+  },
+  false,
+);
 
 export async function GET(request: Request) {
   const { auth, query, error } = await parseRequest(request, schema);
@@ -24,13 +30,13 @@ export async function GET(request: Request) {
     return error();
   }
 
-  const timezone = query.timezone || 'UTC';
+  const { startAt, endAt, timezone = 'UTC' } = resolvePeriodDateRange(query);
   const defaultRange = parseDateRange('7day', undefined, undefined, timezone);
-  const hasDateRange = query.startAt != null && query.endAt != null;
+  const hasDateRange = startAt != null && endAt != null;
   const startDate = hasDateRange
-    ? new Date(query.startAt)
+    ? new Date(startAt)
     : fromZonedTime(defaultRange.startDate, timezone);
-  const endDate = hasDateRange ? new Date(query.endAt) : fromZonedTime(defaultRange.endDate, timezone);
+  const endDate = hasDateRange ? new Date(endAt) : fromZonedTime(defaultRange.endDate, timezone);
 
   const websiteIds = await canViewBatchWebsites(auth, query.ids);
 

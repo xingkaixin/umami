@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { fetchWebsite } from '@/lib/load';
 import { getWebsiteSegment } from '@/queries/drizzle';
-import { getQueryFilters } from './request';
+import { getQueryFilters, resolvePeriodDateRange } from './request';
 
 vi.mock('@/lib/load', () => ({
   fetchAccount: vi.fn(),
@@ -61,4 +61,30 @@ test('ignores saved segment filters that are not filter columns', async () => {
 
   expect(filters.timezone).toBe('UTC');
   expect(filters.browser).toBe('eq.firefox');
+});
+
+test('leaves explicit date parameters unchanged without a period', () => {
+  const params = { startAt: 100, endAt: 200, timezone: 'UTC' };
+
+  expect(resolvePeriodDateRange(params)).toBe(params);
+});
+
+test('resolves a period in its timezone into UTC timestamps', () => {
+  const params = resolvePeriodDateRange(
+    { period: 'today', timezone: 'America/Los_Angeles' },
+    new Date('2026-07-24T12:00:00.000Z'),
+  );
+
+  expect(params).toMatchObject({
+    startAt: +new Date('2026-07-24T07:00:00.000Z'),
+    endAt: +new Date('2026-07-25T06:59:59.999Z'),
+    timezone: 'America/Los_Angeles',
+  });
+});
+
+test('builds query filters from a period', async () => {
+  const filters = await getQueryFilters({ period: '24h' });
+
+  expect(+filters.endDate - +filters.startDate).toBe(24 * 60 * 60 * 1000);
+  expect(filters.timezone).toBe('UTC');
 });
