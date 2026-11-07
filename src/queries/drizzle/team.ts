@@ -1,8 +1,8 @@
 import { and, asc, count, desc, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { getDatabase } from '@/db/client';
-import { deleteOwnedEntities } from '@/db/delete';
+import { deleteOwnedEntities, deleteWebsiteData } from '@/db/delete';
 import { contains, paginate } from '@/db/pagination';
-import { type NewTeam, team, teamUser, user, website } from '@/db/schema';
+import { type NewTeam, report, segment, share, team, teamUser, user, website } from '@/db/schema';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLES } from '@/lib/constants';
 import { uuid } from '@/lib/crypto';
 import { sanitizeSortFilters } from '@/lib/sort';
@@ -145,10 +145,15 @@ export function updateTeam(id: string, data: Partial<NewTeam>) {
 
 export function deleteTeam(id: string) {
   const db = getDatabase();
+  const websiteIds = sql`select website_id from website where team_id = ${id}`;
   return db.batch([
+    ...deleteWebsiteData(db, websiteIds),
+    db.delete(report).where(sql`${report.websiteId} in (${websiteIds})`),
+    db.delete(segment).where(sql`${segment.websiteId} in (${websiteIds})`),
+    db.delete(share).where(sql`${share.entityId} in (${websiteIds})`),
     ...deleteOwnedEntities(db, sql`team_id = ${id}`),
     db.delete(teamUser).where(eq(teamUser.teamId, id)),
-    db.update(website).set({ teamId: null }).where(eq(website.teamId, id)),
+    db.delete(website).where(eq(website.teamId, id)),
     db.delete(team).where(eq(team.id, id)).returning(),
   ]);
 }

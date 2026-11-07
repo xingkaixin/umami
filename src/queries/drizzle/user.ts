@@ -98,8 +98,8 @@ export function updateUser(id: string, data: Partial<NewUser>) {
 
 export function deleteUser(id: string) {
   const db = getDatabase();
-  const websiteIds = sql`select website_id from website where user_id = ${id}`;
   const teamIds = sql`select team_id from team_user where user_id = ${id} and role = ${ROLES.teamOwner}`;
+  const websiteIds = sql`select website_id from website where user_id = ${id} or team_id in (${teamIds})`;
   return db.batch([
     ...deleteWebsiteData(db, websiteIds),
     ...deleteOwnedEntities(db, sql`user_id = ${id} or team_id in (${teamIds})`),
@@ -108,9 +108,8 @@ export function deleteUser(id: string) {
       .where(sql`${report.userId} = ${id} or ${report.websiteId} in (${websiteIds})`),
     db.delete(segment).where(sql`${segment.websiteId} in (${websiteIds})`),
     db.delete(share).where(sql`${share.entityId} in (${websiteIds})`),
-    db.delete(website).where(eq(website.userId, id)),
+    db.delete(website).where(sql`${website.id} in (${websiteIds})`),
     db.update(website).set({ createdBy: null }).where(eq(website.createdBy, id)),
-    db.update(website).set({ teamId: null }).where(sql`${website.teamId} in (${teamIds})`),
     db.delete(team).where(sql`${team.id} in (${teamIds})`),
     db
       .delete(teamUser)
