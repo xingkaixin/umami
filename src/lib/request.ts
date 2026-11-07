@@ -8,14 +8,14 @@ import {
   parseSessionPropertyFilters,
   parseUniversalEventPropertyFilters,
 } from '@/lib/params';
-import { badRequest, unauthorized } from '@/lib/response';
+import { badRequest, forbidden, unauthorized } from '@/lib/response';
 import type { QueryFilters } from '@/lib/types';
 import { getWebsiteSegment } from '@/queries/drizzle';
 
 export async function parseRequest(
   request: Request,
   schema?: any,
-  options?: { skipAuth: boolean },
+  options?: { skipAuth?: boolean; allowTwoFactorSetup?: boolean },
 ): Promise<any> {
   const url = new URL(request.url);
   let query = Object.fromEntries(url.searchParams);
@@ -52,6 +52,12 @@ export async function parseRequest(
 
     if (!auth) {
       error = () => unauthorized();
+    } else if (auth.twoFactorSetupPending && !options?.allowTwoFactorSetup) {
+      error = () =>
+        forbidden({
+          code: 'two-factor-error-setup-required',
+          message: 'Two-factor authentication setup is required',
+        });
     }
   }
 

@@ -4,7 +4,7 @@ import { isTwoFactorConfigured } from '@/lib/two-factor/crypto';
 import { getTwoFactorAuth, getTwoFactorRequirements } from '@/queries/drizzle/twoFactor';
 
 export async function GET(request: Request) {
-  const { auth, error } = await parseRequest(request);
+  const { auth, error } = await parseRequest(request, null, { allowTwoFactorSetup: true });
   if (error) return error();
   if (process.env.CLOUD_MODE) {
     return json({

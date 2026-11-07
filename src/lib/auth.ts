@@ -10,6 +10,7 @@ import { hash, secret } from '@/lib/crypto';
 import { parseSecureToken, parseToken } from '@/lib/jwt';
 import { ensureArray } from '@/lib/utils';
 import { getShare } from '@/queries/drizzle/share';
+import { getTwoFactorAuth } from '@/queries/drizzle/twoFactor';
 import { getUser } from '@/queries/drizzle/user';
 
 const log = debug('umami:auth');
@@ -37,6 +38,10 @@ export async function checkAuth(request: Request) {
       user = null;
     }
   }
+
+  // The same token becomes a full session once 2FA setup completes.
+  const twoFactorSetupPending =
+    !!user && !!payload.twoFactorSetup && !(await getTwoFactorAuth(user.id))?.isEnabled;
 
   log({
     hasToken: !!token,
@@ -67,6 +72,7 @@ export async function checkAuth(request: Request) {
     token,
     shareToken,
     user,
+    twoFactorSetupPending,
   };
 }
 

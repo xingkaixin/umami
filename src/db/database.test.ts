@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkRateLimit, recordFailedAttempt } from '@/lib/two-factor/rate-limit';
 import { createTeam } from '@/queries/drizzle/team';
 import {
@@ -221,4 +221,33 @@ it('only lists team access codes for members who can edit the team', async () =>
     .values({ id: crypto.randomUUID(), teamId, userId: viewerId, role: 'team-view-only' });
   expect((await getUserTeams(ownerId)).data[0].accessCode).toBe('team_secret');
   expect((await getUserTeams(viewerId)).data[0]).not.toHaveProperty('accessCode');
+});
+
+it('limits a login to 2FA setup routes until required 2FA is enabled', async () => {
+  const { POST: login } = await import('@/app/api/auth/login/route');
+  const { GET: getStatus } = await import('@/app/api/2fa/status/route');
+  const { GET: getTeams } = await import('@/app/api/me/teams/route');
+  const { hashPassword } = await import('@/lib/password');
+  const { setGlobalTwoFactorRequired } = await import('@/queries/drizzle/twoFactor');
+  vi.stubEnv('TWO_FACTOR_ENCRYPTION_KEY', 'a'.repeat(64));
+  const userId = crypto.randomUUID();
+  await createUser({ id: userId, username: 'alice', password: hashPassword('pass'), role: 'user' });
+  await setGlobalTwoFactorRequired(true);
+  const response = await login(
+    new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'alice', password: 'pass' }),
+    }),
+  );
+  const { token } = await response.json();
+  const get = (handler: (request: Request) => Promise<Response>, path: string) =>
+    handler(
+      new Request(`http://localhost${path}`, { headers: { authorization: `Bearer ${token}` } }),
+    );
+
+  expect((await get(getTeams, '/api/me/teams')).status).toBe(403);
+  expect((await get(getStatus, '/api/2fa/status')).status).toBe(200);
+  await getDatabase().insert(twoFactorAuth).values({ userId, secret: 'secret', isEnabled: true });
+  expect((await get(getTeams, '/api/me/teams')).status).toBe(200);
+  vi.unstubAllEnvs();
 });

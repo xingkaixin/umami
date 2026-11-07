@@ -3,7 +3,7 @@ import { ROLES } from '@/lib/constants';
 import { hash, secret } from '@/lib/crypto';
 import { createSecureToken } from '@/lib/jwt';
 import { checkPassword } from '@/lib/password';
-import { getTwoFactorAuth } from '@/queries/drizzle/twoFactor';
+import { getTwoFactorAuth, getTwoFactorRequirements } from '@/queries/drizzle/twoFactor';
 import { parseRequest } from '@/lib/request';
 import { json, serviceUnavailable, unauthorized } from '@/lib/response';
 import { getTwoFactorConfigurationError, isTwoFactorConfigured } from '@/lib/two-factor/crypto';
@@ -45,10 +45,20 @@ export async function POST(request: Request) {
     });
     return json({ requiresTwoFactor: true, partialToken });
   }
+
+  // Required 2FA that is not set up yet limits the session to the setup routes.
+  const twoFactorSetup =
+    !cloudMode &&
+    isTwoFactorConfigured() &&
+    Object.values(await getTwoFactorRequirements(id)).some(Boolean);
+
   // Bind token to password hash so a password change invalidates old tokens.
   const pwd = hash(user.password);
 
-  const token = createSecureToken({ userId: id, role, pwd }, secret());
+  const token = createSecureToken(
+    { userId: id, role, pwd, ...(twoFactorSetup && { twoFactorSetup }) },
+    secret(),
+  );
 
   const teams = await getAllUserTeams(id);
 

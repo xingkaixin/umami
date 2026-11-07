@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
   const schema = z.object({ token: z.string().length(6) });
 
-  const { auth, body, error } = await parseRequest(request, schema);
+  const { auth, body, error } = await parseRequest(request, schema, { allowTwoFactorSetup: true });
 
   if (error) {
     return error();
