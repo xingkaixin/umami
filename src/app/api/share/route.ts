@@ -1,8 +1,9 @@
 import z from 'zod';
+import { isUniqueConstraintError } from '@/db/errors';
 import { uuid } from '@/lib/crypto';
 import { getRandomChars } from '@/lib/generate';
 import { parseRequest } from '@/lib/request';
-import { json, unauthorized } from '@/lib/response';
+import { badRequest, json, serverError, unauthorized } from '@/lib/response';
 import { anyObjectParam } from '@/lib/schema';
 import { canUpdateEntity } from '@/permissions';
 import { createShare } from '@/queries/drizzle';
@@ -29,14 +30,22 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const share = await createShare({
-    id: uuid(),
-    entityId,
-    shareType,
-    name,
-    slug: slug || getRandomChars(16),
-    parameters: shareParameters,
-  });
+  try {
+    const share = await createShare({
+      id: uuid(),
+      entityId,
+      shareType,
+      name,
+      slug: slug || getRandomChars(16),
+      parameters: shareParameters,
+    });
 
-  return json(share);
+    return json(share);
+  } catch (e) {
+    if (isUniqueConstraintError(e, 'share.slug')) {
+      return badRequest({ message: 'That slug is already taken.' });
+    }
+
+    return serverError(e);
+  }
 }

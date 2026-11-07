@@ -1,6 +1,7 @@
 import z from 'zod';
+import { isUniqueConstraintError } from '@/db/errors';
 import { parseRequest } from '@/lib/request';
-import { json, notFound, ok, unauthorized } from '@/lib/response';
+import { badRequest, json, notFound, ok, serverError, unauthorized } from '@/lib/response';
 import { anyObjectParam } from '@/lib/schema';
 import { canDeleteEntity, canUpdateEntity, canViewEntity } from '@/permissions';
 import { deleteShare, getShare, updateShare } from '@/queries/drizzle';
@@ -53,13 +54,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ sha
     return unauthorized();
   }
 
-  const result = await updateShare(shareId, {
-    name,
-    slug,
-    parameters,
-  } as any);
+  try {
+    const result = await updateShare(shareId, {
+      name,
+      slug,
+      parameters,
+    } as any);
 
-  return json(result);
+    return json(result);
+  } catch (e) {
+    if (isUniqueConstraintError(e, 'share.slug')) {
+      return badRequest({ message: 'That slug is already taken.' });
+    }
+
+    return serverError(e);
+  }
 }
 
 export async function DELETE(
