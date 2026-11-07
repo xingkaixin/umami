@@ -60,19 +60,22 @@ export const MetricCard = ({
       gap="4"
     >
       {showLabel && (
-        <Row justifyContent="space-between" alignItems="flex-start">
+        <Row justifyContent="space-between" alignItems="center">
           <Text weight="bold" wrap="nowrap">
             {label}
           </Text>
           {tooltip && (
-            <TooltipTrigger delay={0}>
-              <Button size="sm" variant="quiet">
-                <Icon size="sm">
-                  <Info />
-                </Icon>
-              </Button>
-              <Tooltip placement="top">{tooltip}</Tooltip>
-            </TooltipTrigger>
+            // Zero height keeps the info button from making this row taller than cards without one.
+            <span style={{ display: 'flex', alignItems: 'center', height: 0 }}>
+              <TooltipTrigger delay={0}>
+                <Button size="sm" variant="quiet">
+                  <Icon size="sm">
+                    <Info />
+                  </Icon>
+                </Button>
+                <Tooltip placement="top">{tooltip}</Tooltip>
+              </TooltipTrigger>
+            </span>
           )}
         </Row>
       )}
