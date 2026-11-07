@@ -1,10 +1,13 @@
 import { expect, test, vi } from 'vitest';
 import { ENTITY_TYPE } from '@/lib/constants';
 import {
+  canViewAuthenticatedWebsite,
   canViewSharedWebsite,
   canViewSharedWebsiteFilters,
   canViewWebsiteSection,
+  canViewWebsiteSectionRows,
 } from './share';
+import { canViewWebsite } from './website';
 
 vi.mock('./website', () => ({
   canViewWebsite: vi.fn(),
@@ -145,4 +148,52 @@ test('canViewWebsiteSection allows link shares for the shared entity id', async 
       'overview',
     ),
   ).resolves.toBe(true);
+});
+
+test('board shares cannot read sessions or row endpoints', async () => {
+  const auth = {
+    shareToken: { shareType: ENTITY_TYPE.board, websiteIds: ['website-1'], parameters: {} },
+  };
+
+  await expect(canViewWebsiteSection(auth, 'website-1', 'sessions')).resolves.toBe(false);
+  await expect(canViewWebsiteSection(auth, 'website-1', ['overview', 'sessions'])).resolves.toBe(
+    true,
+  );
+  await expect(canViewWebsiteSectionRows(auth, 'website-1', 'events')).resolves.toBe(false);
+  await expect(
+    canViewWebsiteSectionRows(
+      { shareToken: { shareType: ENTITY_TYPE.website, websiteId: 'website-1', parameters: {} } },
+      'website-1',
+      'events',
+    ),
+  ).resolves.toBe(true);
+});
+
+test('a share token sent with an unrelated session keeps the share scope', async () => {
+  vi.mocked(canViewWebsite).mockReset().mockResolvedValue(false);
+  const auth = {
+    user: { id: 'other-user' },
+    shareToken: {
+      shareType: ENTITY_TYPE.website,
+      websiteId: 'website-1',
+      parameters: { overview: true, sessions: false, allowFilter: false },
+    },
+  } as any;
+
+  await expect(canViewWebsiteSection(auth, 'website-1', 'overview')).resolves.toBe(true);
+  await expect(canViewWebsiteSection(auth, 'website-1', 'sessions')).resolves.toBe(false);
+  await expect(canViewSharedWebsiteFilters(auth, 'website-1')).resolves.toBe(false);
+  await expect(canViewAuthenticatedWebsite(auth, 'website-1')).resolves.toBe(false);
+  expect(canViewWebsite).toHaveBeenCalledWith({ user: { id: 'other-user' } }, 'website-1');
+});
+
+test('a website owner keeps full access when a board share token is also sent', async () => {
+  vi.mocked(canViewWebsite).mockReset().mockResolvedValue(true);
+  const auth = {
+    user: { id: 'owner' },
+    shareToken: { shareType: ENTITY_TYPE.board, websiteIds: ['website-1'], parameters: {} },
+  } as any;
+
+  await expect(canViewWebsiteSection(auth, 'website-1', 'sessions')).resolves.toBe(true);
+  await expect(canViewWebsiteSectionRows(auth, 'website-1', 'events')).resolves.toBe(true);
 });

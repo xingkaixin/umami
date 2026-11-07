@@ -43,7 +43,7 @@ export async function canViewReport(auth: Auth, report: Report | null) {
     return !!(await canViewWebsiteSection(auth, report.websiteId, section));
   }
 
-  return !!auth.user && !!(await canViewWebsite(auth, report.websiteId));
+  return !!auth.user && !!(await canViewWebsite({ user: auth.user }, report.websiteId));
 }
 
 export async function canUpdateReport(auth: Auth, report: Report) {

@@ -37,6 +37,18 @@ const SHARE_SECTIONS: ShareSection[] = [
 
 type ShareSectionInput = ShareSection | ShareSection[];
 
+const BOARD_SHARE_EXCLUDED_SECTIONS: ShareSection[] = ['sessions'];
+
+function isBoardShare(auth: Auth | null | undefined) {
+  return auth?.shareToken?.shareType === ENTITY_TYPE.board;
+}
+
+// canViewWebsite also accepts the share token, which would let any signed-in user
+// lift a share's limits by sending its token with their own session.
+async function canUserViewWebsite(auth: Auth | null | undefined, websiteId: string) {
+  return !!auth?.user && canViewWebsite({ user: auth.user }, websiteId);
+}
+
 function shareTokenIncludesWebsite(auth: Auth | null | undefined, websiteId: string) {
   const { shareToken } = auth || {};
 
@@ -55,8 +67,8 @@ export async function canViewWebsiteSection(
   websiteId: string,
   section: ShareSectionInput,
 ) {
-  if (auth?.user) {
-    return canViewWebsite(auth, websiteId);
+  if (await canUserViewWebsite(auth, websiteId)) {
+    return true;
   }
 
   const { shareToken } = auth || {};
@@ -71,15 +83,36 @@ export async function canViewWebsiteSection(
   );
 
   if (!hasSectionParameters) {
+    if (isBoardShare(auth)) {
+      return sections.some(key => !BOARD_SHARE_EXCLUDED_SECTIONS.includes(key));
+    }
+
     return true;
   }
 
   return sections.some(key => shareToken.parameters?.[key] === true);
 }
 
+// Board components only render aggregates, so board shares cannot read individual rows.
+export async function canViewWebsiteSectionRows(
+  auth: Auth | null | undefined,
+  websiteId: string,
+  section: ShareSectionInput,
+) {
+  if (await canUserViewWebsite(auth, websiteId)) {
+    return true;
+  }
+
+  if (isBoardShare(auth)) {
+    return false;
+  }
+
+  return canViewWebsiteSection(auth, websiteId, section);
+}
+
 export async function canViewSharedWebsite(auth: Auth | null | undefined, websiteId: string) {
-  if (auth?.user) {
-    return canViewWebsite(auth, websiteId);
+  if (await canUserViewWebsite(auth, websiteId)) {
+    return true;
   }
 
   return shareTokenIncludesWebsite(auth, websiteId);
@@ -89,8 +122,8 @@ export async function canViewSharedWebsiteFilters(
   auth: Auth | null | undefined,
   websiteId: string,
 ) {
-  if (auth?.user) {
-    return canViewWebsite(auth, websiteId);
+  if (await canUserViewWebsite(auth, websiteId)) {
+    return true;
   }
 
   const { shareToken } = auth || {};
@@ -102,9 +135,5 @@ export async function canViewAuthenticatedWebsite(
   auth: Auth | null | undefined,
   websiteId: string,
 ) {
-  if (!auth?.user) {
-    return false;
-  }
-
-  return canViewWebsite(auth, websiteId);
+  return canUserViewWebsite(auth, websiteId);
 }
