@@ -40,3 +40,24 @@ test('a multi-character value delivered via onChange (mobile paste fallback) fil
   expect(onChange).toHaveBeenLastCalledWith('123456');
   expect(onComplete).toHaveBeenCalledWith('123456');
 });
+
+test('clearing the value moves focus back to the first digit', async () => {
+  const { user, rerender } = render(<OtpInput value="123456" onChange={vi.fn()} />);
+
+  await user.click(getDigitInput(5));
+  rerender(<OtpInput value="" onChange={vi.fn()} />);
+
+  expect(getDigitInput(0)).toHaveFocus();
+});
+
+test('readOnly keeps focus and ignores paste and backspace', async () => {
+  const onChange = vi.fn();
+  const { user } = render(<OtpInput value="123456" onChange={onChange} readOnly />);
+
+  await user.click(getDigitInput(5));
+  await user.keyboard('{Backspace}');
+  await user.paste('654321');
+
+  expect(getDigitInput(5)).toHaveFocus();
+  expect(onChange).not.toHaveBeenCalled();
+});

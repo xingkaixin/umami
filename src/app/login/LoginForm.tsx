@@ -48,7 +48,7 @@ export function LoginForm() {
           name="username"
           rules={{ required: t(labels.required) }}
         >
-          <TextField autoComplete="username" />
+          <TextField autoComplete="username" autoFocus />
         </FormField>
 
         <FormField

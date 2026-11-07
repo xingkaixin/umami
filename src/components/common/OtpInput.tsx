@@ -1,21 +1,43 @@
 'use client';
 import { Row, TextField } from '@umami/react-zen';
-import { type ClipboardEvent, type KeyboardEvent, useRef } from 'react';
+import { type ClipboardEvent, type KeyboardEvent, useEffect, useRef } from 'react';
 
 interface OtpInputProps {
   value: string;
   onChange: (value: string) => void;
   onComplete?: (value: string) => void;
   disabled?: boolean;
+  readOnly?: boolean;
+  autoFocus?: boolean;
 }
 
 const LENGTH = 6;
 
 const focusInput = (el: HTMLDivElement | null) => el?.querySelector('input')?.focus();
 
-export function OtpInput({ value, onChange, onComplete, disabled }: OtpInputProps) {
+export function OtpInput({
+  value,
+  onChange,
+  onComplete,
+  disabled,
+  readOnly,
+  autoFocus,
+}: OtpInputProps) {
   const digits = Array.from({ length: LENGTH }, (_, i) => value?.[i] ?? '');
   const refs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Disabled inputs drop focus, so refocus the first digit once they are enabled again.
+  useEffect(() => {
+    if (autoFocus && !disabled) {
+      focusInput(refs.current[0]);
+    }
+  }, [autoFocus, disabled]);
+
+  useEffect(() => {
+    if (!value && refs.current.some(el => el?.contains(document.activeElement))) {
+      focusInput(refs.current[0]);
+    }
+  }, [value]);
 
   const update = (index: number, char: string) => {
     const next = digits.slice();
@@ -60,7 +82,7 @@ export function OtpInput({ value, onChange, onComplete, disabled }: OtpInputProp
     index: number,
     e: KeyboardEvent<HTMLInputElement & HTMLTextAreaElement>,
   ) => {
-    if (e.key === 'Backspace') {
+    if (e.key === 'Backspace' && !readOnly) {
       if (digits[index]) {
         update(index, '');
       } else if (index > 0) {
@@ -76,7 +98,9 @@ export function OtpInput({ value, onChange, onComplete, disabled }: OtpInputProp
 
   const handlePaste = (e: ClipboardEvent<HTMLInputElement & HTMLTextAreaElement>) => {
     e.preventDefault();
-    applyPastedValue(e.clipboardData.getData('text'));
+    if (!readOnly) {
+      applyPastedValue(e.clipboardData.getData('text'));
+    }
   };
 
   return (
@@ -94,6 +118,7 @@ export function OtpInput({ value, onChange, onComplete, disabled }: OtpInputProp
             onKeyDown={e => handleKeyDown(i, e)}
             onPaste={handlePaste}
             isDisabled={disabled}
+            isReadOnly={readOnly}
             inputMode="numeric"
             maxLength={1}
             autoComplete="one-time-code"
