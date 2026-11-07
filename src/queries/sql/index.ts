@@ -64,4 +64,5 @@ export * from './sessions/getWebsiteSessionStats';
 export * from './sessions/getWebsiteSessions';
 export * from './sessions/saveSessionData';
 export * from './sessions/saveSessionLink';
+export * from './sessions/tryClaimAnonymousSession';
 export * from './sessions/updateSession';

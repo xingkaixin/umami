@@ -175,7 +175,7 @@ test.describe('Website API tests', () => {
     });
     expect(identify.status()).toBe(200);
     const identified = await identify.json();
-    expect(identified.sessionId).not.toBe(sessionId);
+    expect(identified.sessionId).toBe(sessionId);
 
     const performance = await request.post('/api/send', {
       headers: { 'x-umami-cache': identified.cache },

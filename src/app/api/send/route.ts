@@ -16,6 +16,7 @@ import {
   saveEvent,
   saveSessionData,
   saveSessionLink,
+  tryClaimAnonymousSession,
   updateSession,
 } from '@/queries/sql';
 
@@ -25,6 +26,39 @@ interface Cache {
   visitId: string;
   iat: number;
   sessionLinkId?: string;
+}
+
+function resolveSession({
+  sourceId,
+  ip,
+  userAgent,
+  distinctId,
+  createdAt,
+  cache,
+  timestamp,
+}: {
+  sourceId: string;
+  ip: string;
+  userAgent: string;
+  distinctId?: string;
+  createdAt: Date;
+  cache: Cache | null;
+  timestamp?: number;
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const sessionSalt = getSalt(process.env.SALT_ROTATION || 'month', createdAt);
+  const visitSalt = hash(startOfHour(createdAt).toUTCString());
+  const sessionId = uuid(sourceId, ip, userAgent, sessionSalt, distinctId ?? '');
+  const sessionDrift = !!cache?.sessionId && cache.sessionId !== sessionId;
+  let visitId = cache?.visitId || uuid(sessionId, visitSalt);
+  let iat = cache?.iat || now;
+
+  if (sessionDrift || (!timestamp && now - iat > 1800)) {
+    visitId = uuid(sessionId, visitSalt);
+    iat = now;
+  }
+
+  return { sessionId, visitId, iat, sessionDrift };
 }
 
 // Reject strings whose first character is a spreadsheet formula trigger to
@@ -155,19 +189,40 @@ export async function POST(request: Request) {
     }
 
     const createdAt = timestamp ? new Date(timestamp * 1000) : new Date();
-    const now = Math.floor(Date.now() / 1000);
     const distinctId = truncateString(id, FIELD_LENGTH.distinctId);
+    const resolve = (distinctId?: string) =>
+      resolveSession({ sourceId, ip, userAgent, distinctId, createdAt, cache, timestamp });
 
-    const saltRotation = process.env.SALT_ROTATION || 'month';
-    const sessionSalt = getSalt(saltRotation, createdAt);
-    const visitSalt = hash(startOfHour(createdAt).toUTCString());
+    let { sessionId, visitId, iat, sessionDrift } = resolve(distinctId);
 
-    const sessionId = uuid(sourceId, ip, userAgent, sessionSalt, distinctId ?? '');
-    const sessionDrift = !!websiteId && !!cache?.sessionId && cache.sessionId !== sessionId;
-    const shouldEnsureSession = sessionDrift;
+    if (websiteId && distinctId && cache && sessionDrift) {
+      const anonymous = resolve();
+
+      if (anonymous.sessionId === cache.sessionId) {
+        let claimed = cache.sessionLinkId === hash(cache.sessionId, distinctId);
+
+        if (!claimed) {
+          try {
+            claimed = await tryClaimAnonymousSession({
+              websiteId,
+              sessionId: cache.sessionId,
+              distinctId,
+              createdAt,
+            });
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to claim anonymous session:', e);
+          }
+        }
+
+        if (claimed) {
+          ({ sessionId, visitId, iat, sessionDrift } = anonymous);
+        }
+      }
+    }
 
     // Create a session if not found
-    if (!cache?.sessionId || shouldEnsureSession) {
+    if (!cache?.sessionId || sessionDrift) {
       await createSession({
         id: sessionId,
         websiteId: sourceId,
@@ -182,22 +237,6 @@ export async function POST(request: Request) {
         distinctId,
         createdAt,
       });
-    }
-
-    // Visit info
-    let visitId = cache?.visitId || uuid(sessionId, visitSalt);
-    let iat = cache?.iat || now;
-
-    // A drifted cache session should start a fresh visit on the recomputed session.
-    if (sessionDrift) {
-      visitId = uuid(sessionId, visitSalt);
-      iat = now;
-    }
-
-    // Expire visit after 30 minutes
-    if (!timestamp && now - iat > 1800) {
-      visitId = uuid(sessionId, visitSalt);
-      iat = now;
     }
 
     if (type === COLLECTION_TYPE.event) {

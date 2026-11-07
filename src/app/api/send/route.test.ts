@@ -6,7 +6,7 @@ process.env.APP_SECRET = 'route-send-test-secret';
 
 import { isbot } from 'isbot';
 import { CACHE_TOKEN_TYPE, EVENT_TYPE } from '@/lib/constants';
-import { getSalt, secret, uuid } from '@/lib/crypto';
+import { getSalt, hash, secret, uuid } from '@/lib/crypto';
 import { getClientInfo, hasBlockedIp } from '@/lib/detect';
 import { createToken, parseToken } from '@/lib/jwt';
 import { fetchWebsite } from '@/lib/load';
@@ -16,6 +16,7 @@ import {
   saveEvent,
   saveSessionData,
   saveSessionLink,
+  tryClaimAnonymousSession,
   updateSession,
 } from '@/queries/sql';
 import { POST } from './route';
@@ -38,6 +39,7 @@ vi.mock('@/queries/sql', () => ({
   saveEvent: vi.fn(),
   saveSessionData: vi.fn(),
   saveSessionLink: vi.fn(),
+  tryClaimAnonymousSession: vi.fn(),
   updateSession: vi.fn(),
 }));
 
@@ -54,6 +56,7 @@ const createSessionMock = vi.mocked(createSession);
 const saveEventMock = vi.mocked(saveEvent);
 const saveSessionDataMock = vi.mocked(saveSessionData);
 const saveSessionLinkMock = vi.mocked(saveSessionLink);
+const tryClaimAnonymousSessionMock = vi.mocked(tryClaimAnonymousSession);
 const updateSessionMock = vi.mocked(updateSession);
 
 const WEBSITE_ID = '11111111-1111-4111-8111-111111111111';
@@ -121,6 +124,7 @@ beforeEach(() => {
   saveEventMock.mockResolvedValue(undefined as any);
   saveSessionDataMock.mockResolvedValue(undefined as any);
   saveSessionLinkMock.mockResolvedValue(undefined as any);
+  tryClaimAnonymousSessionMock.mockResolvedValue(true);
   updateSessionMock.mockResolvedValue(undefined as any);
 });
 
@@ -596,6 +600,110 @@ describe('cache token handling', () => {
     expect(savedSessionData.sessionId).toBe(createdSession.id);
     expect(body.sessionId).toBe(createdSession.id);
     expect(body.visitId).not.toBe('cached-visit');
+  });
+
+  test('identify claims the anonymous session and keeps the current visit', async () => {
+    const anonSessionId = makeComputedSessionId(WEBSITE_ID);
+    const iat = Math.floor(Date.now() / 1000) - 100;
+    const token = makeCacheToken({ sessionId: anonSessionId, iat });
+
+    const response = await callPOST(
+      { type: 'identify', payload: { website: WEBSITE_ID, id: 'user-42', data: { plan: 'pro' } } },
+      { headers: { 'x-umami-cache': token } },
+    );
+
+    const body = (await response.json()) as Record<string, any>;
+    const nextToken = (await parseToken(body.cache, secret())) as Record<string, any>;
+
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(tryClaimAnonymousSessionMock.mock.calls[0][0]).toMatchObject({
+      websiteId: WEBSITE_ID,
+      sessionId: anonSessionId,
+      distinctId: 'user-42',
+    });
+    expect(saveSessionLinkMock.mock.calls[0][0]).toMatchObject({ sessionId: anonSessionId });
+    expect(updateSessionMock.mock.calls[0][0]).toMatchObject({ sessionId: anonSessionId });
+    expect(saveSessionDataMock.mock.calls[0][0]).toMatchObject({ sessionId: anonSessionId });
+    expect(body.sessionId).toBe(anonSessionId);
+    expect(body.visitId).toBe('cached-visit');
+    expect(nextToken.iat).toBe(iat);
+  });
+
+  test('identify does not reuse an anonymous session claimed by another identity', async () => {
+    const anonSessionId = makeComputedSessionId(WEBSITE_ID);
+    const token = makeCacheToken({ sessionId: anonSessionId });
+    tryClaimAnonymousSessionMock.mockResolvedValue(false);
+
+    const response = await callPOST(
+      { type: 'identify', payload: { website: WEBSITE_ID, id: 'user-99' } },
+      { headers: { 'x-umami-cache': token } },
+    );
+
+    const body = (await response.json()) as Record<string, any>;
+
+    expect(createSessionMock).toHaveBeenCalledTimes(1);
+    expect(body.sessionId).toBe(makeComputedSessionId(WEBSITE_ID, undefined, 'user-99'));
+    expect(body.visitId).not.toBe('cached-visit');
+  });
+
+  test('identify falls back to a new session when the claim fails', async () => {
+    const anonSessionId = makeComputedSessionId(WEBSITE_ID);
+    const token = makeCacheToken({ sessionId: anonSessionId });
+    tryClaimAnonymousSessionMock.mockRejectedValue(new Error('D1 unavailable'));
+
+    const response = await callPOST(
+      { type: 'identify', payload: { website: WEBSITE_ID, id: 'user-42' } },
+      { headers: { 'x-umami-cache': token } },
+    );
+
+    const body = (await response.json()) as Record<string, any>;
+
+    expect(response.status).toBe(200);
+    expect(body.sessionId).toBe(makeComputedSessionId(WEBSITE_ID, undefined, 'user-42'));
+  });
+
+  test('events after identify stay in the claimed session and visit', async () => {
+    const anonSessionId = makeComputedSessionId(WEBSITE_ID);
+    const iat = Math.floor(Date.now() / 1000) - 100;
+    const token = makeCacheToken({
+      sessionId: anonSessionId,
+      iat,
+      sessionLinkId: hash(anonSessionId, 'user-42'),
+    });
+
+    const response = await callPOST(
+      { type: 'event', payload: { website: WEBSITE_ID, url: '/next', id: 'user-42' } },
+      { headers: { 'x-umami-cache': token } },
+    );
+
+    const savedEvent = saveEventMock.mock.calls[0][0] as Record<string, any>;
+    const body = (await response.json()) as Record<string, any>;
+    const nextToken = (await parseToken(body.cache, secret())) as Record<string, any>;
+
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(tryClaimAnonymousSessionMock).not.toHaveBeenCalled();
+    expect(savedEvent.sessionId).toBe(anonSessionId);
+    expect(savedEvent.visitId).toBe('cached-visit');
+    expect(nextToken.iat).toBe(iat);
+  });
+
+  test('events after identify start a new visit after 30 minutes of inactivity', async () => {
+    const anonSessionId = makeComputedSessionId(WEBSITE_ID);
+    const token = makeCacheToken({
+      sessionId: anonSessionId,
+      iat: Math.floor(Date.now() / 1000) - 2000,
+      sessionLinkId: hash(anonSessionId, 'user-42'),
+    });
+
+    await callPOST(
+      { type: 'event', payload: { website: WEBSITE_ID, url: '/next', id: 'user-42' } },
+      { headers: { 'x-umami-cache': token } },
+    );
+
+    const savedEvent = saveEventMock.mock.calls[0][0] as Record<string, any>;
+
+    expect(savedEvent.sessionId).toBe(anonSessionId);
+    expect(savedEvent.visitId).not.toBe('cached-visit');
   });
 
   test('an invalid cache token falls back to website lookup', async () => {
