@@ -297,6 +297,7 @@ export const labels: Record<string, string> = {
   compare: 'label.compare',
   current: 'label.current',
   previous: 'label.previous',
+  next: 'label.next',
   previousPeriod: 'label.previous-period',
   previousYear: 'label.previous-year',
   lastSeen: 'label.last-seen',

@@ -210,6 +210,7 @@
     "name": "Name",
     "needs-improvement": "Needs improvement",
     "new-password": "New password",
+    "next": "Next",
     "none": "None",
     "number-of-records": "{x} {x, plural, one {record} other {records}}",
     "ok": "OK",
