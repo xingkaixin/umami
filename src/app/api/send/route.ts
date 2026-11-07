@@ -87,7 +87,7 @@ const schema = z.object({
       tag: safeStringParam().optional(),
       ip: z.string().optional(),
       userAgent: z.string().optional(),
-      timestamp: z.coerce.number().int().optional(),
+      timestamp: z.coerce.number().int().min(0).max(2147483647).optional(),
       id: z.string().optional(),
       browser: z.string().optional(),
       os: z.string().optional(),
