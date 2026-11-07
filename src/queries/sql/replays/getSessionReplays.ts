@@ -40,7 +40,7 @@ export async function getSessionReplays(
     : '';
 
   const havingQuery = minDurationMs
-    ? `having sum(round((julianday(sr.ended_at) - julianday(sr.started_at)) * 86400000)) >= {{minDurationMs}}`
+    ? `having round((julianday(max(sr.ended_at)) - julianday(min(sr.started_at))) * 86400000) >= {{minDurationMs}}`
     : '';
 
   return pagedRawQuery(
@@ -58,7 +58,7 @@ export async function getSessionReplays(
       count(sr.replay_id) as "chunkCount",
       min(sr.started_at) as "startedAt",
       max(sr.ended_at) as "endedAt",
-      sum(round((julianday(sr.ended_at) - julianday(sr.started_at)) * 86400000)) as "duration",
+      round((julianday(max(sr.ended_at)) - julianday(min(sr.started_at))) * 86400000) as "duration",
       max(sr.created_at) as "createdAt"
     from session_replay sr
     join session on session.session_id = sr.session_id
