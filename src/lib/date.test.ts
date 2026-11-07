@@ -20,6 +20,7 @@ import {
 } from 'date-fns';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  alignCompareSeries,
   formatDate,
   generateTimeSeries,
   getAllowedUnits,
@@ -449,6 +450,54 @@ describe('generateTimeSeries', () => {
     const series = generateTimeSeries([], min, max, 'day', 'en-US');
     expect(series).toHaveLength(1);
     expect(series[0].y).toBeNull();
+  });
+});
+
+describe('alignCompareSeries', () => {
+  const yesterday = new Date('2026-09-24T00:00:00');
+  const today = new Date('2026-09-25T00:00:00');
+  const previous = [
+    { x: '2026-09-24T01:00:00Z', y: 5 },
+    { x: '2026-09-24 03:00:00', y: 7 },
+  ];
+
+  test('pairs buckets by offset from the period start', () => {
+    const series = alignCompareSeries(
+      previous,
+      yesterday,
+      today,
+      new Date('2026-09-25T04:59:59.999'),
+      'hour',
+    );
+
+    expect(series.map(({ y }) => y)).toEqual([0, 5, 0, 7, 0]);
+    expect(series[1]).toEqual({ x: '2026-09-25T01:00:00', y: 5, d: '2026-09-24T01:00:00Z' });
+    expect(series[0].d).toBe('2026-09-24T00:00:00');
+  });
+
+  test('stops at the end date', () => {
+    const series = alignCompareSeries(
+      previous,
+      yesterday,
+      today,
+      new Date('2026-09-25T02:35:00'),
+      'hour',
+    );
+
+    expect(series.map(({ y }) => y)).toEqual([0, 5, 0]);
+  });
+
+  test('keeps day positions across months of different length', () => {
+    const series = alignCompareSeries(
+      [{ x: '2026-08-02T00:00:00Z', y: 3 }],
+      new Date('2026-08-01T00:00:00'),
+      new Date('2026-09-01T00:00:00'),
+      new Date('2026-09-30T23:59:59.999'),
+      'day',
+    );
+
+    expect(series).toHaveLength(30);
+    expect(series[1]).toEqual({ x: '2026-09-02T00:00:00', y: 3, d: '2026-08-02T00:00:00Z' });
   });
 });
 

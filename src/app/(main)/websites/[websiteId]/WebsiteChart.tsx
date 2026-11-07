@@ -3,6 +3,7 @@ import { LoadingPanel } from '@/components/common/LoadingPanel';
 import { useDateRange, useTimezone } from '@/components/hooks';
 import { useWebsitePageviewsQuery } from '@/components/hooks/queries/useWebsitePageviewsQuery';
 import { PageviewsChart } from '@/components/metrics/PageviewsChart';
+import { alignCompareSeries, minDate } from '@/lib/date';
 
 export function WebsiteChart({
   websiteId,
@@ -11,8 +12,8 @@ export function WebsiteChart({
   websiteId: string;
   compareMode?: boolean;
 }) {
-  const { timezone } = useTimezone();
-  const { dateRange, dateCompare } = useDateRange({ timezone: timezone });
+  const { timezone, fromUtc } = useTimezone();
+  const { dateRange, dateCompare } = useDateRange({ timezone });
   const { startDate, endDate, unit, value } = dateRange;
   const { data, isLoading, isFetching, error } = useWebsitePageviewsQuery({
     websiteId,
@@ -25,25 +26,21 @@ export function WebsiteChart({
       return { pageviews: [], sessions: [] };
     }
 
+    if (!compare) {
+      return { pageviews, sessions };
+    }
+
+    const compareStartDate = fromUtc(compare.startDate);
+    const compareEndDate = minDate(fromUtc(new Date()), endDate);
+    const align = (series: { x: string; y: number }[]) =>
+      alignCompareSeries(series, compareStartDate, startDate, compareEndDate, unit);
+
     return {
       pageviews,
       sessions,
-      ...(compare && {
-        compare: {
-          pageviews: pageviews.map(({ x }, i) => ({
-            x,
-            y: compare.pageviews[i]?.y,
-            d: compare.pageviews[i]?.x,
-          })),
-          sessions: sessions.map(({ x }, i) => ({
-            x,
-            y: compare.sessions[i]?.y,
-            d: compare.sessions[i]?.x,
-          })),
-        },
-      }),
+      compare: { pageviews: align(compare.pageviews), sessions: align(compare.sessions) },
     };
-  }, [data, startDate, endDate, unit]);
+  }, [data, startDate, endDate, unit, timezone]);
 
   return (
     <LoadingPanel data={data} isFetching={isFetching} isLoading={isLoading} error={error}>
