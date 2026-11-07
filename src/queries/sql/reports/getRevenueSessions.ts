@@ -28,7 +28,7 @@ export async function getRevenueSessions(
     select
       session.session_id as "id",
       session.website_id as "websiteId",
-      website_event.hostname,
+      max(website_event.hostname) as hostname,
       session.browser,
       session.os,
       session.device,
@@ -63,7 +63,6 @@ export async function getRevenueSessions(
     group by
       session.session_id,
       session.website_id,
-      website_event.hostname,
       session.browser,
       session.os,
       session.device,
