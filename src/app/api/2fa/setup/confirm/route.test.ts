@@ -8,8 +8,7 @@ const mocks = vi.hoisted(() => ({
   generateBackupCodes: vi.fn(),
   decryptSecret: vi.fn(),
   isTwoFactorConfigured: vi.fn(),
-  checkRateLimit: vi.fn(),
-  recordFailedAttempt: vi.fn(),
+  reserveAttempt: vi.fn(),
   isOtpReplayed: vi.fn(),
   verifyTotp: vi.fn(),
 }));
@@ -39,8 +38,7 @@ vi.mock('@/lib/two-factor/crypto', () => ({
 }));
 
 vi.mock('@/lib/two-factor/rate-limit', () => ({
-  checkRateLimit: mocks.checkRateLimit,
-  recordFailedAttempt: mocks.recordFailedAttempt,
+  reserveAttempt: mocks.reserveAttempt,
 }));
 
 vi.mock('@/lib/two-factor/totp', () => ({
@@ -54,8 +52,7 @@ beforeEach(() => {
   mocks.generateBackupCodes.mockReset();
   mocks.decryptSecret.mockReset();
   mocks.isTwoFactorConfigured.mockReset();
-  mocks.checkRateLimit.mockReset();
-  mocks.recordFailedAttempt.mockReset();
+  mocks.reserveAttempt.mockReset();
   mocks.isOtpReplayed.mockReset();
   mocks.verifyTotp.mockReset();
 
@@ -76,8 +73,7 @@ beforeEach(() => {
   });
   mocks.decryptSecret.mockReturnValue('plain-secret');
   mocks.isTwoFactorConfigured.mockReturnValue(true);
-  mocks.checkRateLimit.mockResolvedValue({ allowed: true });
-  mocks.recordFailedAttempt.mockResolvedValue({ lockedUntil: undefined });
+  mocks.reserveAttempt.mockResolvedValue({ allowed: true });
   mocks.isOtpReplayed.mockResolvedValue(false);
   mocks.verifyTotp.mockResolvedValue(true);
 });
@@ -87,7 +83,7 @@ test('POST confirms setup, enables 2FA, stores backup codes, and resets the rate
     new Request('http://localhost/api/2fa/setup/confirm', { method: 'POST' }),
   );
 
-  expect(mocks.checkRateLimit).toHaveBeenCalledWith('user-1');
+  expect(mocks.reserveAttempt).toHaveBeenCalledWith('user-1');
   expect(mocks.decryptSecret).toHaveBeenCalledWith('encrypted');
   expect(mocks.verifyTotp).toHaveBeenCalledWith('123456', 'plain-secret');
   expect(mocks.confirmTwoFactorSetup).toHaveBeenCalledWith(
@@ -109,7 +105,7 @@ test('POST reports a configuration error when the encryption key is missing', as
     new Request('http://localhost/api/2fa/setup/confirm', { method: 'POST' }),
   );
 
-  expect(mocks.checkRateLimit).not.toHaveBeenCalled();
+  expect(mocks.reserveAttempt).not.toHaveBeenCalled();
   expect(mocks.decryptSecret).not.toHaveBeenCalled();
   await expect(response.json()).resolves.toMatchObject({
     error: {
@@ -126,7 +122,7 @@ test('POST records a failed attempt and skips writes when the token is invalid',
     new Request('http://localhost/api/2fa/setup/confirm', { method: 'POST' }),
   );
 
-  expect(mocks.recordFailedAttempt).toHaveBeenCalledWith('user-1');
+  expect(mocks.reserveAttempt).toHaveBeenCalledWith('user-1');
   expect(mocks.confirmTwoFactorSetup).not.toHaveBeenCalled();
   await expect(response.json()).resolves.toMatchObject({
     error: {

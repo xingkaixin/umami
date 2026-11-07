@@ -13,8 +13,7 @@ const mocks = vi.hoisted(() => ({
   verifyBackupCode: vi.fn(),
   decryptSecret: vi.fn(),
   isTwoFactorConfigured: vi.fn(),
-  checkRateLimit: vi.fn(),
-  recordFailedAttempt: vi.fn(),
+  reserveAttempt: vi.fn(),
   resetRateLimit: vi.fn(),
   isOtpReplayed: vi.fn(),
   consumeOtp: vi.fn(),
@@ -65,8 +64,7 @@ vi.mock('@/lib/two-factor/crypto', () => ({
 }));
 
 vi.mock('@/lib/two-factor/rate-limit', () => ({
-  checkRateLimit: mocks.checkRateLimit,
-  recordFailedAttempt: mocks.recordFailedAttempt,
+  reserveAttempt: mocks.reserveAttempt,
   resetRateLimit: mocks.resetRateLimit,
 }));
 
@@ -95,8 +93,7 @@ beforeEach(() => {
   mocks.verifyBackupCode.mockReset();
   mocks.decryptSecret.mockReset();
   mocks.isTwoFactorConfigured.mockReset();
-  mocks.checkRateLimit.mockReset();
-  mocks.recordFailedAttempt.mockReset();
+  mocks.reserveAttempt.mockReset();
   mocks.resetRateLimit.mockReset();
   mocks.isOtpReplayed.mockReset();
   mocks.consumeOtp.mockReset();
@@ -121,8 +118,7 @@ beforeEach(() => {
   mocks.createSecureToken.mockReturnValue('full-auth-token');
   mocks.decryptSecret.mockReturnValue('plain-secret');
   mocks.isTwoFactorConfigured.mockReturnValue(true);
-  mocks.checkRateLimit.mockResolvedValue({ allowed: true });
-  mocks.recordFailedAttempt.mockResolvedValue({ lockedUntil: undefined });
+  mocks.reserveAttempt.mockResolvedValue({ allowed: true });
   mocks.resetRateLimit.mockResolvedValue(undefined);
   mocks.isOtpReplayed.mockResolvedValue(false);
   mocks.consumeOtp.mockResolvedValue(true);

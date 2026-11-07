@@ -7,7 +7,7 @@ import {
   getTwoFactorConfigurationError,
   isTwoFactorConfigured,
 } from '@/lib/two-factor/crypto';
-import { checkRateLimit, recordFailedAttempt } from '@/lib/two-factor/rate-limit';
+import { reserveAttempt } from '@/lib/two-factor/rate-limit';
 import { isOtpReplayed } from '@/queries/drizzle/twoFactor';
 import { verifyTotp } from '@/lib/two-factor/totp';
 import { confirmTwoFactorSetup, getTwoFactorAuth } from '@/queries/drizzle/twoFactor';
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   // Verify rate limit
-  const rateCheck = await checkRateLimit(userId);
+  const rateCheck = await reserveAttempt(userId);
   if (!rateCheck.allowed) {
     return Response.json(
       {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   // Verify TOTP
   const secret = decryptSecret(twoFactor.secret);
   if (!(await verifyTotp(token, secret))) {
-    const { lockedUntil } = await recordFailedAttempt(userId);
+    const { lockedUntil } = rateCheck;
     return badRequest({
       code: 'two-factor-error-invalid-code',
       message: 'Invalid verification code',

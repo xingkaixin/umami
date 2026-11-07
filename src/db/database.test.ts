@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkRateLimit, recordFailedAttempt } from '@/lib/two-factor/rate-limit';
+import { reserveAttempt } from '@/lib/two-factor/rate-limit';
 import { createTeam } from '@/queries/drizzle/team';
 import {
   confirmTwoFactorSetup,
@@ -121,10 +121,11 @@ describe('D1 data access', () => {
     expect((await getUnusedBackupCodes(userId)).map(row => row.codeHash)).toEqual(['first-code']);
   });
 
-  it('counts concurrent failed attempts atomically', async () => {
+  it('allows only five concurrent 2FA attempts before locking', async () => {
     const userId = crypto.randomUUID();
-    await Promise.all(Array.from({ length: 5 }, () => recordFailedAttempt(userId)));
-    expect(await checkRateLimit(userId)).toMatchObject({
+    const attempts = await Promise.all(Array.from({ length: 20 }, () => reserveAttempt(userId)));
+    expect(attempts.filter(attempt => attempt.allowed)).toHaveLength(5);
+    expect(await reserveAttempt(userId)).toMatchObject({
       allowed: false,
       lockedUntil: expect.any(Date),
     });
