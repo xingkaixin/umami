@@ -938,10 +938,12 @@ function ScrollHeatmapView({
                 transform: `scale(${fit.scale})`,
               }}
             >
-              {shouldRenderSnapshot && !snapshotReady && <CanvasLoading />}
-              {shouldRenderSnapshot && snapshot && (
-                <SnapshotPreview snapshot={snapshot} onReady={handleSnapshotReady} />
-              )}
+              <div className={styles.snapshotClip}>
+                {shouldRenderSnapshot && !snapshotReady && <CanvasLoading />}
+                {shouldRenderSnapshot && snapshot && (
+                  <SnapshotPreview snapshot={snapshot} onReady={handleSnapshotReady} />
+                )}
+              </div>
               {showOverlay && (
                 <div className={styles.overlay}>
                   {bands.map(band => {

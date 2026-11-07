@@ -197,6 +197,9 @@
   overflow: hidden;
   border-radius: inherit;
   background: inherit;
+  /* Safari can paint the scrolled iframe layer above the overlay without this. */
+  z-index: 0;
+  isolation: isolate;
 }
 
 .snapshot {
@@ -237,6 +240,10 @@
   bottom: 0;
   z-index: 3;
   pointer-events: none;
+  /* Keep the overlay composited above the iframe snapshot in Safari. */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .canvasLoading {
