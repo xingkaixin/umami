@@ -39,14 +39,6 @@ export function getTeamUsers(teamId: string, filters: QueryFilters = {}) {
   );
 }
 
-export async function getTeamMemberIds(teamId: string) {
-  const rows = await getDatabase()
-    .select({ userId: teamUser.userId })
-    .from(teamUser)
-    .where(eq(teamUser.teamId, teamId));
-  return rows.map(row => row.userId);
-}
-
 export function createTeamUser(userId: string, teamId: string, role: string) {
   return getDatabase()
     .insert(teamUser)

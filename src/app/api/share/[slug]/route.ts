@@ -7,7 +7,6 @@ import type { Auth, BoardParameters } from '@/lib/types';
 import { canViewLink, canViewPixel, canViewWebsite } from '@/permissions';
 import {
   getBoard,
-  getTeamMemberIds,
   getLink,
   getPixel,
   getShareByCode,
@@ -35,8 +34,10 @@ async function filterEntityIds(
   return results.filter((id): id is string => !!id);
 }
 
-function isOwnedByTeam(entity: OwnedEntity, teamId: string, teamUserIds: Set<string>) {
-  return entity?.teamId === teamId || !!(entity?.userId && teamUserIds.has(entity.userId));
+// Members' personal entities are excluded: any member who can edit the board can share it,
+// including members who cannot view a teammate's personal website.
+function isOwnedByTeam(entity: OwnedEntity, teamId: string) {
+  return entity?.teamId === teamId;
 }
 
 async function filterBoardEntityIdsForShare(
@@ -44,17 +45,15 @@ async function filterBoardEntityIdsForShare(
   ids: BoardEntityIds,
 ): Promise<BoardEntityIds> {
   if (entity.teamId) {
-    const teamUserIds = new Set(await getTeamMemberIds(entity.teamId));
-
     return {
       websiteIds: await filterEntityIds(ids.websiteIds, async id =>
-        isOwnedByTeam(await getWebsite(id), entity.teamId, teamUserIds),
+        isOwnedByTeam(await getWebsite(id), entity.teamId),
       ),
       pixelIds: await filterEntityIds(ids.pixelIds, async id =>
-        isOwnedByTeam(await getPixel(id), entity.teamId, teamUserIds),
+        isOwnedByTeam(await getPixel(id), entity.teamId),
       ),
       linkIds: await filterEntityIds(ids.linkIds, async id =>
-        isOwnedByTeam(await getLink(id), entity.teamId, teamUserIds),
+        isOwnedByTeam(await getLink(id), entity.teamId),
       ),
     };
   }
