@@ -22,9 +22,14 @@ export function DatePickerForm({
   const [endDate, setEndDate] = useState(defaultEndDate || new Date());
   const { t, labels } = useMessages();
 
+  const isInvalidDay = (value: Date) =>
+    !value ||
+    Boolean(minDate && isBefore(startOfDay(value), startOfDay(minDate))) ||
+    Boolean(maxDate && isAfter(startOfDay(value), startOfDay(maxDate)));
+
   const disabled = selected.includes(FILTER_DAY)
-    ? isAfter(minDate, date) && isBefore(maxDate, date)
-    : isAfter(startDate, endDate);
+    ? isInvalidDay(date)
+    : isInvalidDay(startDate) || isInvalidDay(endDate) || isAfter(startDate, endDate);
 
   const handleSave = () => {
     if (selected.includes(FILTER_DAY)) {
@@ -51,7 +56,13 @@ export function DatePickerForm({
       </Row>
       <Column>
         {selected.includes(FILTER_DAY) && (
-          <Calendar value={date} minValue={minDate} maxValue={maxDate} onChange={setDate} />
+          <Calendar
+            value={date}
+            minValue={minDate}
+            maxValue={maxDate}
+            onChange={setDate}
+            required
+          />
         )}
         {selected.includes(FILTER_RANGE) && (
           <Row gap wrap="wrap" style={{ margin: '0 auto' }}>
@@ -60,12 +71,14 @@ export function DatePickerForm({
               minValue={minDate}
               maxValue={endDate}
               onChange={setStartDate}
+              required
             />
             <Calendar
               value={endDate}
               minValue={startDate}
               maxValue={maxDate}
               onChange={setEndDate}
+              required
             />
           </Row>
         )}

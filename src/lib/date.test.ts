@@ -92,6 +92,13 @@ describe('parseDateRange', () => {
     expect(parseDateRange(undefined as any)).toBeNull();
   });
 
+  test('returns null for invalid custom ranges', () => {
+    expect(parseDateRange('range:')).toBeNull();
+    expect(parseDateRange('range:NaN:NaN')).toBeNull();
+    expect(parseDateRange('range:12345:undefined')).toBeNull();
+    expect(parseDateRange('range:100000000000000000000000:0')).toBeNull();
+  });
+
   test('returns null for unknown date values', () => {
     expect(parseDateRange('invalid')).toBeNull();
     expect(parseDateRange('7days')).toBeNull();
