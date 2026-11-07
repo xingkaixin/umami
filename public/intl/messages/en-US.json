@@ -1,5 +1,7 @@
 {
   "label": {
+    "12-hour": "12-hour",
+    "24-hour": "24-hour",
     "access-code": "Access code",
     "account": "Account",
     "action": "Action",
@@ -169,6 +171,7 @@
     "journey-description": "Understand how users navigate through your website.",
     "journeys": "Journeys",
     "language": "Language",
+    "language-default": "Language default",
     "languages": "Languages",
     "laptop": "Laptop",
     "last-click": "Last click",
@@ -341,6 +344,7 @@
     "this-month": "This month",
     "this-week": "This week",
     "this-year": "This year",
+    "time-format": "Time format",
     "timezone": "Timezone",
     "title": "Title",
     "today": "Today",

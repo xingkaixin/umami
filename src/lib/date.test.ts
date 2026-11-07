@@ -40,6 +40,7 @@ import {
   parseDateRange,
   parseDateValue,
 } from './date';
+import { setHour12 } from './lang';
 
 // A fixed instant used across timezone-sensitive tests. All expected date
 // values are recomputed with the same date-fns helpers the implementation
@@ -428,6 +429,35 @@ describe('formatDate', () => {
   test('accepts numeric timestamp input', () => {
     const date = new Date('2026-07-24T00:00:00');
     expect(formatDate(date.getTime(), 'yyyy')).toBe('2026');
+  });
+});
+
+describe('formatDate clock format', () => {
+  const date = new Date(2026, 9, 1, 13, 5, 9);
+
+  afterEach(() => {
+    setHour12(undefined);
+  });
+
+  test('follows the locale by default', () => {
+    expect(formatDate(date, 'p')).toBe('1:05 PM');
+    expect(formatDate(date, 'p', 'de-DE')).toBe('13:05');
+  });
+
+  test('forces 24-hour time', () => {
+    setHour12(false);
+    expect(formatDate(date, 'pp')).toBe('13:05:09');
+    expect(formatDate(date, 'PPpp')).toBe('Oct 1, 2026, 13:05:09');
+  });
+
+  test('forces 12-hour time', () => {
+    setHour12(true);
+    expect(formatDate(date, 'p', 'de-DE')).toBe('1:05 nachm.');
+  });
+
+  test('leaves date-only patterns untouched', () => {
+    setHour12(false);
+    expect(formatDate(date, 'PP')).toBe('Oct 1, 2026');
   });
 });
 

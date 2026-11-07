@@ -1,5 +1,7 @@
 {
   "label": {
+    "12-hour": "12 小时制",
+    "24-hour": "24 小时制",
     "access-code": "访问代码",
     "account": "账户",
     "action": "行为",
@@ -169,6 +171,7 @@
     "journey-description": "了解用户如何浏览网站。",
     "journeys": "用户路径",
     "language": "语言",
+    "language-default": "跟随语言",
     "languages": "语言",
     "laptop": "笔记本",
     "last-click": "最后点击",
@@ -341,6 +344,7 @@
     "this-month": "本月",
     "this-week": "本周",
     "this-year": "今年",
+    "time-format": "时间格式",
     "timezone": "时区",
     "title": "标题",
     "today": "今天",
