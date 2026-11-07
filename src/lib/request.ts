@@ -128,7 +128,9 @@ export async function getQueryFilters(
       const segmentParams = (await getWebsiteSegment(websiteId, params.segment))
         ?.parameters as Record<string, any>;
 
-      Object.assign(filters, filtersArrayToObject(segmentParams.filters));
+      // Stored filter names are free-form; without this a filter named e.g. "timezone"
+      // would replace the validated request value.
+      Object.assign(filters, getRequestFilters(filtersArrayToObject(segmentParams.filters)));
       sessionPropertyFilters.push(...(segmentParams.sessionPropertyFilters ?? []));
 
       if (segmentParams.match) {
