@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { DOMAIN_REGEX, ENTITY_TYPE } from '@/lib/constants';
 import { uuid } from '@/lib/crypto';
+import { isEntityIdInUse } from '@/lib/entity';
 import { getQueryFilters, parseRequest } from '@/lib/request';
-import { json, unauthorized } from '@/lib/response';
+import { badRequest, json, unauthorized } from '@/lib/response';
 import { pagingParams, searchParams, sortingParams } from '@/lib/schema';
 import { canCreateTeamWebsite, canCreateWebsite } from '@/permissions';
 import {
@@ -57,6 +58,10 @@ export async function POST(request: Request) {
 
   if ((teamId && !(await canCreateTeamWebsite(auth, teamId))) || !(await canCreateWebsite(auth))) {
     return unauthorized();
+  }
+
+  if (id && (await isEntityIdInUse(id))) {
+    return badRequest({ message: 'ID already in use.' });
   }
 
   const data: any = {

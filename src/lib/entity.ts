@@ -1,5 +1,5 @@
 import type { Board, Link, Pixel, Website } from '@/db/schema';
-import { getBoard, getLink, getPixel, getWebsite } from '@/queries/drizzle';
+import { getBoard, getLink, getPixel, getUser, getWebsite } from '@/queries/drizzle';
 
 export async function getEntity(entityId: string): Promise<Website | Link | Pixel | Board | null> {
   const [website, link, pixel, board] = await Promise.all([
@@ -12,4 +12,12 @@ export async function getEntity(entityId: string): Promise<Website | Link | Pixe
   const entity = website || link || pixel || board;
 
   return entity;
+}
+
+// Authorization resolves an id against every entity table, and dashboard boards reuse
+// their owner's user id, so a caller-supplied id must not match any of them.
+export async function isEntityIdInUse(id: string) {
+  const [entity, user] = await Promise.all([getEntity(id), getUser(id, { showDeleted: true })]);
+
+  return !!(entity || user);
 }
