@@ -208,3 +208,17 @@ it('creates a board when the optional description is omitted', async () => {
   expect(response.status).toBe(200);
   expect(await getBoard(result.id)).toMatchObject({ name: 'Board', description: '' });
 });
+
+it('only lists team access codes for members who can edit the team', async () => {
+  const { getUserTeams } = await import('@/queries/drizzle/team');
+  const ownerId = crypto.randomUUID();
+  const viewerId = crypto.randomUUID();
+  const teamId = crypto.randomUUID();
+  await createUser({ id: ownerId, username: 'owner', password: 'hash', role: 'user' });
+  await createTeam({ id: teamId, name: 'Team', accessCode: 'team_secret' }, ownerId);
+  await getDatabase()
+    .insert(teamUser)
+    .values({ id: crypto.randomUUID(), teamId, userId: viewerId, role: 'team-view-only' });
+  expect((await getUserTeams(ownerId)).data[0].accessCode).toBe('team_secret');
+  expect((await getUserTeams(viewerId)).data[0]).not.toHaveProperty('accessCode');
+});

@@ -3,7 +3,7 @@ import { getDatabase } from '@/db/client';
 import { deleteOwnedEntities } from '@/db/delete';
 import { contains, paginate } from '@/db/pagination';
 import { type NewTeam, team, teamUser, user, website } from '@/db/schema';
-import { ROLES } from '@/lib/constants';
+import { PERMISSIONS, ROLE_PERMISSIONS, ROLES } from '@/lib/constants';
 import { uuid } from '@/lib/crypto';
 import { sanitizeSortFilters } from '@/lib/sort';
 import type { QueryFilters } from '@/lib/types';
@@ -57,13 +57,14 @@ export async function getTeams(filters: QueryFilters = {}, userId?: string) {
     db.select({ count: count() }).from(team).where(where),
     options,
   );
-  if (!result.data.length) return result;
   const ids = JSON.stringify(result.data.map(row => row.id));
-  const members = await db
-    .select({ ...getTableColumns(teamUser), user: { id: user.id, username: user.username } })
-    .from(teamUser)
-    .leftJoin(user, eq(teamUser.userId, user.id))
-    .where(sql`${teamUser.teamId} in (select value from json_each(${ids}))`);
+  const members = result.data.length
+    ? await db
+        .select({ ...getTableColumns(teamUser), user: { id: user.id, username: user.username } })
+        .from(teamUser)
+        .leftJoin(user, eq(teamUser.userId, user.id))
+        .where(sql`${teamUser.teamId} in (select value from json_each(${ids}))`)
+    : [];
   return {
     ...result,
     data: result.data.map(row => ({
@@ -73,8 +74,18 @@ export async function getTeams(filters: QueryFilters = {}, userId?: string) {
   };
 }
 
-export function getUserTeams(userId: string, filters?: QueryFilters) {
-  return getTeams(filters, userId);
+export async function getUserTeams(userId: string, filters?: QueryFilters) {
+  const result = await getTeams(filters, userId);
+  const canUpdate = (role?: string) =>
+    (ROLE_PERMISSIONS[role] as readonly string[] | undefined)?.includes(PERMISSIONS.teamUpdate);
+
+  return {
+    ...result,
+    data: result.data.map(({ accessCode, ...row }) => ({
+      ...row,
+      ...(canUpdate(row.members.find(member => member.userId === userId)?.role) && { accessCode }),
+    })),
+  };
 }
 
 export function getAllUserTeams(userId: string) {
