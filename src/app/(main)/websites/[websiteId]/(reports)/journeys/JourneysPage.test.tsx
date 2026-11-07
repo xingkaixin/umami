@@ -57,6 +57,7 @@ vi.mock('@umami/react-zen', async importOriginal => {
 });
 
 vi.mock('@/components/hooks', () => ({
+  useTimezone: () => ({ timezone: 'UTC' }),
   useDateRange: () => ({
     dateRange: mockDateRange,
   }),

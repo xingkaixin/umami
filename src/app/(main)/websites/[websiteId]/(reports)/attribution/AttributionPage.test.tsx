@@ -63,6 +63,7 @@ vi.mock('@/components/common/Empty', () => ({
 }));
 
 vi.mock('@/components/hooks', () => ({
+  useTimezone: () => ({ timezone: 'UTC' }),
   useDateRange: () => ({
     dateRange: mockDateRange,
   }),

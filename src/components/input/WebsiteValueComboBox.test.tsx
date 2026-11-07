@@ -39,6 +39,7 @@ vi.mock('@/components/hooks', () => ({
     t: (value: string) => value,
     messages: { noResultsFound: 'No results found' },
   }),
+  useTimezone: () => ({ toUtc: (date: Date) => date }),
   useWebsiteValuesQuery: ({ type }: { type: string }) => ({
     data: type === 'path' ? [{ value: '/home' }] : type === 'event' ? [{ value: 'signup' }] : [],
     isLoading: false,
