@@ -80,9 +80,12 @@ export function createAuthKey() {
 }
 
 export function getSalt(saltRotation: string, createdAt: Date): string {
-  return hash(
-    (saltRotation === 'day' ? startOfDay : saltRotation === 'week' ? startOfWeek : startOfMonth)(
-      createdAt,
-    ).toUTCString(),
-  );
+  const period = saltRotation?.trim().toLowerCase();
+  const startOfPeriod = ['day', 'daily'].includes(period)
+    ? startOfDay
+    : ['week', 'weekly'].includes(period)
+      ? startOfWeek
+      : startOfMonth;
+
+  return hash(startOfPeriod(createdAt).toUTCString());
 }
