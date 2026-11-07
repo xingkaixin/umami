@@ -1,6 +1,6 @@
 'use client';
 import { Column, Grid, Label, ListItem, Row, Select } from '@umami/react-zen';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ComboBox } from '@/components/common/ComboBox';
 import { LoadingPanel } from '@/components/common/LoadingPanel';
 import { Panel } from '@/components/common/Panel';
@@ -27,11 +27,6 @@ export function EventProperties({ websiteId }: { websiteId: string }) {
   const [propertyName, setPropertyName] = useState('');
   const [propertyFilters, setPropertyFilters] = useState<PropertyFilter[]>([]);
   const { t, labels } = useMessages();
-
-  useEffect(() => {
-    setPropertyName('');
-    setPropertyFilters([]);
-  }, [eventName]);
 
   const { data, isLoading, isFetching, error } = useEventDataPropertiesQuery(websiteId);
 
@@ -72,8 +67,13 @@ export function EventProperties({ websiteId }: { websiteId: string }) {
   }, [eventNames, eventSearch]);
 
   const handleEventChange = (value: string) => {
+    const keepProperty = data?.some(
+      (field: { eventName: string; propertyName: string }) =>
+        field.eventName === value && field.propertyName === propertyName,
+    );
+
     setEventName(value);
-    setPropertyName('');
+    setPropertyName(keepProperty ? propertyName : '');
     setPropertyFilters([]);
   };
 
