@@ -13,7 +13,6 @@ import {
   startOfYear,
   subDays,
   subHours,
-  subMinutes,
   subMonths,
   subWeeks,
   subYears,
@@ -334,7 +333,7 @@ describe('getAllowedUnits', () => {
 
 describe('getCompareDate', () => {
   const startDate = new Date('2026-07-01T00:00:00Z');
-  const endDate = new Date('2026-07-08T00:00:00Z');
+  const endDate = new Date('2026-07-07T23:59:59.999Z');
 
   test('year over year shifts both bounds back one year', () => {
     expect(getCompareDate('yoy', startDate, endDate)).toEqual({
@@ -344,13 +343,41 @@ describe('getCompareDate', () => {
     });
   });
 
-  test('previous period shifts back by the span length', () => {
-    const result = getCompareDate('prev', startDate, endDate);
-    expect(result.compare).toBe('prev');
-    // 7 days = 10080 minutes
-    expect(result.startDate).toEqual(subMinutes(startDate, 10080));
-    expect(result.endDate).toEqual(subMinutes(endDate, 10080));
-    expect(result.endDate).toEqual(startDate);
+  test('previous period is the full span right before the start', () => {
+    expect(getCompareDate('prev', startDate, endDate)).toEqual({
+      compare: 'prev',
+      startDate: new Date('2026-06-24T00:00:00Z'),
+      endDate: new Date('2026-06-30T23:59:59.999Z'),
+    });
+  });
+
+  test('ongoing periods compare only the elapsed whole hours', () => {
+    const now = new Date('2026-07-01T10:30:00Z');
+
+    expect(getCompareDate('prev', startDate, endDate, now)).toEqual({
+      compare: 'prev',
+      startDate: new Date('2026-06-24T00:00:00Z'),
+      endDate: new Date('2026-06-24T09:59:59.999Z'),
+    });
+    expect(getCompareDate('yoy', startDate, endDate, now)).toEqual({
+      compare: 'yoy',
+      startDate: new Date('2025-07-01T00:00:00Z'),
+      endDate: new Date('2025-07-01T09:59:59.999Z'),
+    });
+  });
+
+  test('an ongoing period in its first hour has an empty comparison', () => {
+    const result = getCompareDate('prev', startDate, endDate, new Date('2026-07-01T00:20:00Z'));
+
+    expect(result.endDate < result.startDate).toBe(true);
+  });
+
+  test('finished periods ignore now', () => {
+    const now = new Date('2026-08-01T00:00:00Z');
+
+    expect(getCompareDate('prev', startDate, endDate, now)).toEqual(
+      getCompareDate('prev', startDate, endDate),
+    );
   });
 
   test('returns empty object for unknown compare modes', () => {
