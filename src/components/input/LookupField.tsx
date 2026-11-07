@@ -1,6 +1,6 @@
 import { type ComboBoxProps, ListItem, Loading, useDebounce } from '@umami/react-zen';
 import { endOfDay, subMonths } from 'date-fns';
-import { type SetStateAction, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ComboBox } from '@/components/common/ComboBox';
 import { Empty } from '@/components/common/Empty';
 import { useMessages, useWebsiteValuesQuery } from '@/components/hooks';
@@ -49,8 +49,10 @@ export function LookupField({
     return items;
   }, [allowCustomValue, items, value]);
 
-  const handleSearch = (value: SetStateAction<string>) => {
-    setSearch(value);
+  const handleChange = (next: string) => {
+    setSearch(next);
+    onChange?.(next);
+    onValueChange?.(next);
   };
 
   return (
@@ -58,12 +60,10 @@ export function LookupField({
       aria-label="LookupField"
       {...props}
       items={options}
-      inputValue={value}
-      onInputValueChange={value => {
-        handleSearch(value);
-        onChange?.(value);
-        onValueChange?.(value);
-      }}
+      value={value ?? ''}
+      inputValue={value ?? ''}
+      onChange={value => handleChange(value ?? '')}
+      onInputValueChange={handleChange}
       renderEmptyState={() =>
         isLoading ? (
           <Loading placement="center" icon="dots" />
