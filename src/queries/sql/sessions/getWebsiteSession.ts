@@ -16,6 +16,15 @@ export async function getWebsiteSession(websiteId: string, sessionId: string) {
       country,
       region,
       city,
+      (select first_event.referrer_domain
+       from website_event first_event
+       where first_event.website_id = {{websiteId}}
+         and first_event.session_id = {{sessionId}}
+         and first_event.event_type != ${EVENT_TYPE.performance}
+         and first_event.referrer_domain != ''
+         and first_event.referrer_domain != (case when substr(first_event.hostname, 1, 4) = 'www.' then substr(first_event.hostname, 5) else first_event.hostname end)
+       order by first_event.created_at, first_event.event_id
+       limit 1) as "referrerDomain",
       min(min_time) as "firstAt",
       max(max_time) as "lastAt",
       count(distinct visit_id) as visits,
