@@ -1,4 +1,4 @@
-import { Column, Heading, Row, SearchField, Text } from '@umami/react-zen';
+import { Box, Column, Heading, Row, SearchField, StatusLight, Text } from '@umami/react-zen';
 import { type CSSProperties, type ReactElement, useMemo, useState } from 'react';
 import { List, type RowComponentProps } from 'react-window';
 import { SessionModal } from '@/app/(main)/websites/[websiteId]/sessions/SessionModal';
@@ -27,6 +27,7 @@ const TYPE_SESSION = 'session';
 const TYPE_EVENT = 'event';
 const MAX_LIST_HEIGHT = 500;
 const ROW_HEIGHT = 50;
+const ACTIVE_THRESHOLD = 5 * 60 * 1000;
 
 const icons = {
   [TYPE_PAGEVIEW]: <Eye />,
@@ -45,6 +46,19 @@ export function RealtimeLog({ data }: { data: any }) {
   const [filter, setFilter] = useState(TYPE_ALL);
   const { updateParams } = useNavigation();
   const { isPhone } = useMobile();
+
+  const activeSessions = useMemo(() => {
+    const now = Date.now();
+    const active = new Set<string>();
+
+    for (const { sessionId, createdAt } of data?.events ?? []) {
+      if (now - new Date(createdAt).getTime() <= ACTIVE_THRESHOLD) {
+        active.add(sessionId);
+      }
+    }
+
+    return active;
+  }, [data]);
 
   const buttons = [
     {
@@ -129,7 +143,23 @@ export function RealtimeLog({ data }: { data: any }) {
       <Row alignItems="center" style={{ ...style, minWidth: 0 }} gap>
         <Row minWidth="30px">
           <Link href={updateParams({ session: row.sessionId })}>
-            <Avatar seed={row.sessionId} size={32} />
+            <Row position="relative">
+              <Avatar seed={row.sessionId} size={32} />
+              {activeSessions.has(row.sessionId) && (
+                <Box
+                  position="absolute"
+                  right="-2px"
+                  bottom="-2px"
+                  borderRadius="full"
+                  backgroundColor="surface"
+                  role="img"
+                  title={t(labels.online)}
+                  aria-label={t(labels.online)}
+                >
+                  <StatusLight variant="success" />
+                </Box>
+              )}
+            </Row>
           </Link>
         </Row>
         <Row minWidth="100px">
