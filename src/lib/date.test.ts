@@ -36,6 +36,7 @@ import {
   maxDate,
   minDate,
   normalizeTimezone,
+  parseBackendDate,
   parseDateRange,
   parseDateValue,
 } from './date';
@@ -428,6 +429,20 @@ describe('generateTimeSeries', () => {
     expect(series[4].y).toBeNull();
   });
 
+  test('places Z-suffixed backend buckets on their wall-clock hour', () => {
+    const min = new Date('2026-07-01T00:00:00');
+    const max = new Date('2026-07-01T02:00:00');
+    const series = generateTimeSeries(
+      [{ x: '2026-07-01T01:00:00Z', y: 5 }],
+      min,
+      max,
+      'hour',
+      'en-US',
+    );
+
+    expect(series.map(s => s.y)).toEqual([null, 5, null]);
+  });
+
   test('single bucket when min and max share a period', () => {
     const min = new Date('2026-07-01T03:00:00');
     const max = new Date('2026-07-01T21:00:00');
@@ -494,5 +509,15 @@ describe('isInvalidDate', () => {
     expect(isInvalidDate('2026-07-24')).toBe(false);
     expect(isInvalidDate(null)).toBe(false);
     expect(isInvalidDate(undefined)).toBe(false);
+  });
+});
+
+describe('parseBackendDate', () => {
+  test('reads Z-suffixed buckets as wall-clock time', () => {
+    expect(parseBackendDate('2026-10-01T00:00:00Z')).toEqual(new Date('2026-10-01T00:00:00'));
+  });
+
+  test('reads buckets without Z as local time', () => {
+    expect(parseBackendDate('2026-10-01 05:00:00')).toEqual(new Date('2026-10-01T05:00:00'));
   });
 });
