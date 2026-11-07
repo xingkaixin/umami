@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isUniqueConstraintError } from '@/db/errors';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, ok, serverError, unauthorized } from '@/lib/response';
 import { canDeletePixel, canUpdatePixel, canViewPixel } from '@/permissions';
@@ -45,8 +46,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ pix
     const pixel = await updatePixel(pixelId, { name, slug });
 
     return Response.json(pixel);
-  } catch (e: any) {
-    if (e.message.toLowerCase().includes('unique constraint') && e.message.includes('slug')) {
+  } catch (e) {
+    if (isUniqueConstraintError(e, 'pixel.slug')) {
       return badRequest({ message: 'That slug is already taken.' });
     }
 

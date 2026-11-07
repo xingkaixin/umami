@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isUniqueConstraintError } from '@/db/errors';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, ok, serverError, unauthorized } from '@/lib/response';
 import { isValidUrl } from '@/lib/url';
@@ -47,8 +48,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ lin
     const result = await updateLink(linkId, { name, url, slug });
 
     return Response.json(result);
-  } catch (e: any) {
-    if (e.message.toLowerCase().includes('unique constraint') && e.message.includes('slug')) {
+  } catch (e) {
+    if (isUniqueConstraintError(e, 'link.slug')) {
       return badRequest({ message: 'That slug is already taken.' });
     }
 

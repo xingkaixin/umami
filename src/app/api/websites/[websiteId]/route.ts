@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isUniqueConstraintError } from '@/db/errors';
 import { DOMAIN_REGEX, ENTITY_TYPE } from '@/lib/constants';
 import { uuid } from '@/lib/crypto';
 import { getRecorderConfig, getRecorderEnabled } from '@/lib/recorder';
@@ -114,8 +115,8 @@ export async function POST(
       ...website,
       shareId: share?.slug ?? null,
     });
-  } catch (e: any) {
-    if (e.message.toLowerCase().includes('unique constraint')) {
+  } catch (e) {
+    if (isUniqueConstraintError(e, 'share.slug')) {
       return badRequest({ message: 'That share ID is already taken.' });
     }
 
