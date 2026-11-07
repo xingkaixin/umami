@@ -11,12 +11,13 @@ export function useDateRange(options: { ignoreOffset?: boolean; timezone?: strin
   } = useNavigation();
   const { locale } = useLocale();
   const dateRange = useMemo(() => {
-    const dateRangeObject = parseDateRange(
-      date || getItem(DATE_RANGE_CONFIG) || DEFAULT_DATE_RANGE_VALUE,
-      unit,
-      locale,
-      options.timezone,
-    );
+    const dateRangeObject =
+      parseDateRange(
+        date || getItem(DATE_RANGE_CONFIG) || DEFAULT_DATE_RANGE_VALUE,
+        unit,
+        locale,
+        options.timezone,
+      ) || parseDateRange(DEFAULT_DATE_RANGE_VALUE, unit, locale, options.timezone);
 
     return !options.ignoreOffset && offset
       ? getOffsetDateRange(dateRangeObject, +offset)
