@@ -49,7 +49,7 @@ export async function getPerformance(
         ${percentileSQL('value', 0.95)} as p95 from ranked group by t order by t`,
       queryParams,
     ),
-    getPerformanceSummary(websiteId, { ...filters, ...parameters }),
+    getPerformanceSummary(websiteId, { ...filters, ...parameters }, metric),
   ]);
   return { chart, summary };
 }

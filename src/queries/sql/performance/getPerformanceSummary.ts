@@ -5,7 +5,13 @@ import type { QueryFilters } from '@/lib/types';
 
 const metrics = ['lcp', 'inp', 'cls', 'fcp', 'ttfb'] as const;
 
-export async function getPerformanceSummary(websiteId: string, filters: QueryFilters) {
+export async function getPerformanceSummary(
+  websiteId: string,
+  filters: QueryFilters,
+  metric?: string,
+) {
+  if (metric && !metrics.includes(metric as (typeof metrics)[number]))
+    throw new Error('Invalid performance metric.');
   const { filterQuery, joinSessionQuery, cohortQuery, queryParams } = await parseFilters({
     ...filters,
     websiteId,
@@ -19,7 +25,7 @@ export async function getPerformanceSummary(websiteId: string, filters: QueryFil
   );
   const [row] = await rawQuery(
     `${rankedQuery(source, [...metrics])}
-    select ${columns.join(', ')}, count(*) as count from ranked`,
+    select ${columns.join(', ')}, count(${metric ?? '*'}) as count from ranked`,
     queryParams,
   );
   return {

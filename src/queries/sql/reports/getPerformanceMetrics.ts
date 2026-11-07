@@ -36,7 +36,7 @@ export async function getPerformanceMetrics(
   return rawQuery(
     `${rankedQuery(source, ['value'], ['name'])}
     select name, ${percentileSQL('value', 0.5)} as p50, ${percentileSQL('value', 0.75)} as p75,
-      ${percentileSQL('value', 0.95)} as p95, count(*) as count
+      ${percentileSQL('value', 0.95)} as p95, count(value) as count
     from ranked group by name order by p75 desc ${limit ? `limit ${limit}` : ''}`,
     { ...queryParams, startDate, endDate },
   );
