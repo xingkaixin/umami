@@ -24,7 +24,7 @@ export function GoalsPage({ websiteId }: { websiteId: string }) {
           <GoalAddButton websiteId={websiteId} />
         </SectionHeader>
       )}
-      <LoadingPanel data={data} isLoading={isLoading} error={error}>
+      <LoadingPanel data={data} isLoading={isLoading} error={error} isEmpty={!data?.data?.length}>
         {data && (
           <Grid columns={{ base: '1fr', md: '1fr 1fr' }} gap>
             {data.data.map((report: any) => (

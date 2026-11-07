@@ -24,7 +24,7 @@ export function FunnelsPage({ websiteId }: { websiteId: string }) {
           <FunnelAddButton websiteId={websiteId} />
         </SectionHeader>
       )}
-      <LoadingPanel data={data} isLoading={isLoading} error={error}>
+      <LoadingPanel data={data} isLoading={isLoading} error={error} isEmpty={!data?.data?.length}>
         {data && (
           <Grid gap>
             {data.data?.map((report: any) => (
