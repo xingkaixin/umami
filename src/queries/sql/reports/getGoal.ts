@@ -1,6 +1,7 @@
 import { parseFilters } from '@/db/filters';
 import { rawQuery } from '@/db/query';
 import { EVENT_TYPE } from '@/lib/constants';
+import { getWildcardMatch } from '@/lib/search';
 import type { QueryFilters } from '@/lib/types';
 
 export interface GoalParameters {
@@ -19,18 +20,13 @@ export async function getGoal(
   const eventType = type === 'path' ? EVENT_TYPE.pageView : EVENT_TYPE.customEvent;
   const column = type === 'path' ? 'url_path' : 'event_name';
 
-  let operator = '=';
-  let paramValue = value;
-  if (value.startsWith('*') || value.endsWith('*')) {
-    operator = 'like';
-    paramValue = value.replace(/^\*|\*$/g, '%');
-  }
+  const match = getWildcardMatch(column, 'value', value);
 
   const { filterQuery, dateQuery, joinSessionQuery, cohortQuery, queryParams } = await parseFilters(
     {
       ...filters,
       websiteId,
-      value: paramValue,
+      value: match.value,
       startDate,
       endDate,
       eventType,
@@ -59,7 +55,7 @@ export async function getGoal(
     ${cohortQuery}
     ${joinSessionQuery}
     where website_event.website_id = {{websiteId}}
-      and ${column} ${operator} {{value}}
+      and ${match.sql}
       ${dateQuery}
       ${filterQuery}
     `,

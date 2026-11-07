@@ -93,7 +93,7 @@ export async function getColumnFilters(
 }
 
 export function getSearchSQL(column: string, param = 'search') {
-  return `and lower(${column}) like lower({{${param}}})`;
+  return `and lower(${column}) like lower({{${param}}}) escape '\\'`;
 }
 
 async function propertyFilters(

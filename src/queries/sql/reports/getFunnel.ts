@@ -1,6 +1,7 @@
 import { getAddIntervalQuery } from '@/db/dates';
 import { parseFilters } from '@/db/filters';
 import { rawQuery } from '@/db/query';
+import { getWildcardMatch } from '@/lib/search';
 import type { QueryFilters } from '@/lib/types';
 
 export interface FunnelStepFilter {
@@ -100,13 +101,7 @@ export async function getFunnel(
         const isURL = cv.type === 'path';
         const column = isURL ? 'url_path' : 'event_name';
 
-        let operator = '=';
-        let paramValue = cv.value;
-
-        if (cv.value.startsWith('*') || cv.value.endsWith('*')) {
-          operator = 'like';
-          paramValue = cv.value.replace(/^\*|\*$/g, '%');
-        }
+        const match = getWildcardMatch(column, String(i), cv.value);
 
         const existsClause =
           !isURL && cv.filters?.length
@@ -127,7 +122,7 @@ export async function getFunnel(
             ${joinSessionQuery}
             where website_event.website_id = {{websiteId}}
               and website_event.created_at between {{startDate}} and {{endDate}}
-              and ${column} ${operator} {{${i}}}
+              and ${match.sql}
               ${filterQuery}
               ${existsClause}
           )`;
@@ -143,14 +138,14 @@ export async function getFunnel(
                   `l.created_at `,
                   `${window} minute`,
                 )}
-                and we.${column} ${operator} {{${i}}}
+                and we.${match.sql}
                 and we.created_at <= {{endDate}}
                 ${existsClause}
           )`;
         }
 
         pv.sumQuery += `\n${startSum}select ${levelNumber} as level, count(distinct(session_id)) as count from level${levelNumber}`;
-        pv.params[i] = paramValue;
+        pv.params[i] = match.value;
 
         return pv;
       },

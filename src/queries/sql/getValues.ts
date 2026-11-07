@@ -1,6 +1,7 @@
 import { getSearchSQL } from '@/db/filters';
 import { rawQuery } from '@/db/query';
 import { FILTER_COLUMNS, SESSION_COLUMNS } from '@/lib/constants';
+import { escapeLikeValue } from '@/lib/search';
 import type { QueryFilters } from '@/lib/types';
 
 const SESSION_DB_COLUMNS = new Set(
@@ -8,7 +9,7 @@ const SESSION_DB_COLUMNS = new Set(
 );
 
 export async function getValues(websiteId: string, column: string, filters: QueryFilters) {
-  const params = {};
+  const params: Record<string, string> = {};
   const { startDate, endDate, search } = filters;
 
   let searchQuery = '';
@@ -20,19 +21,20 @@ export async function getValues(websiteId: string, column: string, filters: Quer
   }
 
   if (search) {
-    if (decodeURIComponent(search).includes(',')) {
-      searchQuery = `AND (${decodeURIComponent(search)
+    if (search.includes(',')) {
+      searchQuery = `AND (${search
         .split(',')
         .slice(0, 5)
         .map((value: string, index: number) => {
           const key = `search${index}`;
 
-          params[key] = value;
+          params[key] = `%${escapeLikeValue(value)}%`;
 
           return getSearchSQL(column, key).replace('and ', '');
         })
         .join(' OR ')})`;
     } else {
+      params.search = `%${escapeLikeValue(search)}%`;
       searchQuery = getSearchSQL(column);
     }
   }
@@ -49,7 +51,7 @@ export async function getValues(websiteId: string, column: string, filters: Quer
       order by 2 desc
       limit 10
       `,
-      { websiteId, startDate, endDate, search: `%${search}%`, ...params },
+      { websiteId, startDate, endDate, ...params },
     );
   }
 
@@ -65,6 +67,6 @@ export async function getValues(websiteId: string, column: string, filters: Quer
     order by 2 desc
     limit 10
     `,
-    { websiteId, startDate, endDate, search: `%${search}%`, ...params },
+    { websiteId, startDate, endDate, ...params },
   );
 }
