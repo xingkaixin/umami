@@ -53,9 +53,18 @@ export function md5(...args: string[]) {
   return crypto.createHash('md5').update(args.join('')).digest('hex');
 }
 
+const APP_SECRET_PLACEHOLDER = 'replace-with-a-random-64-character-hex-string';
+
 export function secret() {
-  if (!process.env.APP_SECRET) throw new Error('APP_SECRET is required.');
-  return hash(process.env.APP_SECRET);
+  const value = process.env.APP_SECRET;
+  const trimmed = value?.trim();
+
+  if (!trimmed || trimmed === APP_SECRET_PLACEHOLDER) {
+    throw new Error('APP_SECRET must be set to a random secret, not empty or the example value.');
+  }
+
+  // Hash the raw value: changing the input would change derived visitor ids and invalidate tokens.
+  return hash(value);
 }
 
 export function uuid(...args: any) {

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { decrypt, encrypt, hash, md5, uuid } from './crypto';
+import { decrypt, encrypt, hash, md5, secret, uuid } from './crypto';
 
 describe('encrypt/decrypt', () => {
   test('round-trips a value with the same secret', () => {
@@ -86,4 +86,16 @@ describe('uuid', () => {
 
     vi.unstubAllEnvs();
   });
+});
+
+test('secret rejects blank and example APP_SECRET values', () => {
+  for (const value of ['', '   ', ' replace-with-a-random-64-character-hex-string ']) {
+    vi.stubEnv('APP_SECRET', value);
+    expect(() => secret()).toThrow('APP_SECRET');
+  }
+
+  vi.stubEnv('APP_SECRET', 'test-secret');
+  expect(secret()).toBe(hash('test-secret'));
+
+  vi.unstubAllEnvs();
 });
