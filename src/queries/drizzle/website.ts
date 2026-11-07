@@ -5,6 +5,7 @@ import { getDatabase } from '@/db/client';
 import { deleteWebsiteData } from '@/db/delete';
 import { contains, paginate } from '@/db/pagination';
 import {
+  board,
   type NewWebsite,
   report,
   segment,
@@ -14,6 +15,7 @@ import {
   user,
   website,
 } from '@/db/schema';
+import { BOARD_TYPES } from '@/lib/boards';
 import { ROLES } from '@/lib/constants';
 import { sanitizeSortFilters } from '@/lib/sort';
 import type { QueryFilters } from '@/lib/types';
@@ -164,6 +166,41 @@ export function createWebsite(data: NewWebsite) {
 export function updateWebsite(id: string, data: Partial<NewWebsite>) {
   if (Object.values(data).every(value => value === undefined)) return getWebsite(id);
   return getDatabase().update(website).set(data).where(eq(website.id, id)).returning().get();
+}
+
+// Single-website boards only show their website, so they follow it to the new owner.
+export async function transferWebsite(
+  id: string,
+  owner: { userId: string; teamId: null } | { userId: null; teamId: string },
+) {
+  const db = getDatabase();
+  const current = await db
+    .select({ userId: website.userId, teamId: website.teamId })
+    .from(website)
+    .where(eq(website.id, id))
+    .get();
+
+  if (!current?.teamId && !current?.userId) {
+    return updateWebsite(id, owner);
+  }
+
+  const [rows] = await db.batch([
+    db.update(website).set(owner).where(eq(website.id, id)).returning(),
+    db
+      .update(board)
+      .set(owner)
+      .where(
+        and(
+          eq(board.type, BOARD_TYPES.website),
+          sql`json_extract(${board.parameters}, '$.websiteId') = ${id}`,
+          current.teamId
+            ? eq(board.teamId, current.teamId)
+            : and(eq(board.userId, current.userId), isNull(board.teamId)),
+        ),
+      ),
+  ]);
+
+  return rows[0];
 }
 
 export async function resetWebsite(id: string) {
