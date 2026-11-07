@@ -83,7 +83,6 @@ export async function getWebsites(
           sql`${website.teamId} in (
       select team.team_id from team inner join team_user on team_user.team_id = team.team_id
       where team.deleted_at is null and team_user.user_id = ${options.accessUserId}
-        and team_user.role in (${ROLES.teamOwner}, ${ROLES.teamManager})
     )`,
         )
       : undefined,
