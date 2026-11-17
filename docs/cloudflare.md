@@ -39,6 +39,9 @@ is managed in Cloudflare, separately from Worker deployments.
 
 Use Node.js 24, pnpm 11, and the global `cf` installed through mise
 (`npm:cf`, tested with 1.0.0-beta.12). Do not add `cf` to project dependencies.
+The current build emits Build Output Specification v0; cf 1.0.0-rc.0 rejects
+that format. If the global CLI is newer, run deployment commands with
+`mise exec npm:cf@1.0.0-beta.12 -- cf ...`, matching CI.
 Install dependencies with `pnpm install --frozen-lockfile`. The approved
 `workerd` install script supplies the local Workers runtime.
 

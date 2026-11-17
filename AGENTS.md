@@ -5,6 +5,7 @@
 - `origin` 必须指向 `xingkaixin/umami`。未经明确要求，不向上游推送或提交 PR。
 - 技术栈是 vinext、Cloudflare Workers、D1、Drizzle。不要重新引入 Prisma 或 PostgreSQL 运行时。
 - 保留上游 MIT 许可证和来源说明。
+- 上游检查点和迁移决策记录在 `docs/upstream.md`。检查更新前先读取该文件，只筛选检查点之后的新提交；检查完成后更新完整 SHA，并分别记录已迁入、已覆盖、暂缓和不适用的内容。检查点不代表完整合并或功能对齐。
 
 ## 开发与验证
 
