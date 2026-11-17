@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, test, vi } from 'vitest';
 import { reserveAttempt } from '@/lib/two-factor/rate-limit';
 import { createTeam } from '@/queries/drizzle/team';
 import {
@@ -222,6 +222,44 @@ it('only lists team access codes for members who can edit the team', async () =>
     .values({ id: crypto.randomUUID(), teamId, userId: viewerId, role: 'team-view-only' });
   expect((await getUserTeams(ownerId)).data[0].accessCode).toBe('team_secret');
   expect((await getUserTeams(viewerId)).data[0]).not.toHaveProperty('accessCode');
+});
+
+test('keeps the current login after a password change and rejects the previous token', async () => {
+  const { POST: login } = await import('@/app/api/auth/login/route');
+  const { POST: changePassword } = await import('@/app/api/me/password/route');
+  const { checkAuth } = await import('@/lib/auth');
+  const { hashPassword } = await import('@/lib/password');
+  const userId = crypto.randomUUID();
+  await createUser({
+    id: userId,
+    username: 'alice',
+    password: hashPassword('old-password'),
+    role: 'user',
+  });
+  const loginResponse = await login(
+    new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'alice', password: 'old-password' }),
+    }),
+  );
+  const { token: previousToken } = await loginResponse.json();
+  const authRequest = (token: string) =>
+    new Request('http://localhost/api/me', { headers: { authorization: `Bearer ${token}` } });
+
+  const response = await changePassword(
+    new Request('http://localhost/api/me/password', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${previousToken}` },
+      body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
+    }),
+  );
+  const body = await response.json();
+
+  expect(response.status).toBe(200);
+  expect(body).not.toHaveProperty('password');
+  await expect(checkAuth(authRequest(previousToken))).resolves.toBeNull();
+  expect(body.token).toEqual(expect.any(String));
+  await expect(checkAuth(authRequest(body.token))).resolves.toMatchObject({ user: { id: userId } });
 });
 
 it('limits a login to 2FA setup routes until required 2FA is enabled', async () => {

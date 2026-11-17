@@ -7,6 +7,7 @@ import {
   PasswordField,
 } from '@umami/react-zen';
 import { useMessages, useUpdateQuery } from '@/components/hooks';
+import { setClientAuthToken } from '@/lib/client';
 
 export function PasswordEditForm({ onSave, onClose }) {
   const { t, labels, messages, getErrorMessage } = useMessages();
@@ -14,7 +15,8 @@ export function PasswordEditForm({ onSave, onClose }) {
 
   const handleSubmit = async (data: any) => {
     await mutateAsync(data, {
-      onSuccess: async () => {
+      onSuccess: async ({ token }: { token: string }) => {
+        setClientAuthToken(token);
         onSave();
         onClose();
       },

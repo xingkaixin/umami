@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { hash, secret } from '@/lib/crypto';
+import { createSecureToken } from '@/lib/jwt';
 import { checkPassword, hashPassword } from '@/lib/password';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, notFound } from '@/lib/response';
@@ -32,6 +34,7 @@ export async function POST(request: Request) {
   const password = hashPassword(newPassword);
 
   const updated = await updateUser(userId, { password });
+  const token = createSecureToken({ userId, role: user.role, pwd: hash(password) }, secret());
 
-  return json(updated);
+  return json({ ...updated, token });
 }

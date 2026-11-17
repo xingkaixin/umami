@@ -20,20 +20,14 @@ export function useApi() {
   const shareToken = useApp(state => state.shareToken?.token);
 
   const shareHeaders =
-    shareId && shareToken
-      ? { [SHARE_TOKEN_HEADER]: shareToken, [SHARE_CONTEXT_HEADER]: '1' }
-      : {};
+    shareId && shareToken ? { [SHARE_TOKEN_HEADER]: shareToken, [SHARE_CONTEXT_HEADER]: '1' } : {};
 
-  const defaultHeaders = {
-    authorization: `Bearer ${getClientAuthToken()}`,
-    ...shareHeaders,
-  };
   const getUrl = (url: string) => {
     return getApiUrl(url);
   };
 
   const getHeaders = (headers: any = {}) => {
-    return { ...defaultHeaders, ...headers };
+    return { authorization: `Bearer ${getClientAuthToken()}`, ...shareHeaders, ...headers };
   };
 
   return {
