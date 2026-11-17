@@ -51,18 +51,18 @@ not cherry-picked together with unrelated upstream code.
 
 1. Read this file before searching upstream history. Keep `origin` pointing to
    `xingkaixin/umami`.
-2. Fetch upstream branches by URL without merging them. For each fetched head,
-   exclude both checkpoints so a commit reviewed on `dev` is not reviewed again
-   when it reaches `master`:
+2. Fetch both upstream branches before comparing them so both checkpoints are
+   available in a fresh checkout. Keep local tracking refs without merging:
 
    ```sh
-   git fetch --no-tags https://github.com/umami-software/umami.git master
-   git log --no-merges --oneline FETCH_HEAD ^<master-checkpoint> ^<dev-checkpoint>
-   git fetch --no-tags https://github.com/umami-software/umami.git dev
-   git log --no-merges --oneline FETCH_HEAD ^<master-checkpoint> ^<dev-checkpoint>
+   git fetch --no-tags https://github.com/umami-software/umami.git \
+     master:refs/remotes/upstream/master dev:refs/remotes/upstream/dev
+   git log --no-merges --oneline upstream/master ^<master-checkpoint> ^<dev-checkpoint>
+   git log --no-merges --oneline upstream/dev ^<master-checkpoint> ^<dev-checkpoint>
    ```
 
-3. Check actual code and fork history before marking a change as missing.
+3. Exclude both checkpoints so a commit reviewed on `dev` is not reviewed again
+   when it reaches `master`. Check actual code and fork history before marking a change as missing.
    Consult the deferred decisions instead of rediscovering older candidates.
 4. Record each selected source SHA and its adaptation. Advance each branch's
    checkpoint only after reviewing its new commits, even if none are ported.
