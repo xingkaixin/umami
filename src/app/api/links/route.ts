@@ -4,7 +4,7 @@ import { isEntityIdInUse } from '@/lib/entity';
 import { getQueryFilters, parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
 import { pagingParams, searchParams, sortingParams } from '@/lib/schema';
-import { isValidUrl } from '@/lib/url';
+import { isValidLinkUrl } from '@/lib/url';
 import { canCreateTeamWebsite, canCreateWebsite } from '@/permissions';
 import { createLink, getUserLinks } from '@/queries/drizzle';
 
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const schema = z.object({
     name: z.string().max(100),
-    url: z.string().trim().max(500).refine(isValidUrl, { message: 'Invalid URL.' }),
+    url: z.string().trim().max(500).refine(isValidLinkUrl, { message: 'Invalid URL.' }),
     slug: z.string().min(8).max(100),
     teamId: z.string().nullable().optional(),
     id: z.uuid().nullable().optional(),

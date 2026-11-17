@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { POST } from '@/app/api/send/route';
 import { notFound } from '@/lib/response';
-import { isValidUrl } from '@/lib/url';
+import { isValidLinkUrl } from '@/lib/url';
 import { getLinkBySlug } from '@/queries/drizzle';
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   const link = await getLinkBySlug(slug);
 
-  if (!link || !isValidUrl(link.url)) return notFound();
+  if (!link || !isValidLinkUrl(link.url)) return notFound();
 
   const payload = {
     type: 'event',

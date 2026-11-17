@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   buildPath,
   getQueryString,
-  isValidUrl,
+  isValidLinkUrl,
   safeDecodeURI,
   safeDecodeURIComponent,
 } from './url';
@@ -69,15 +69,19 @@ describe('safeDecodeURIComponent', () => {
   });
 });
 
-describe('isValidUrl', () => {
+describe('isValidLinkUrl', () => {
   test('returns true for valid urls', () => {
-    expect(isValidUrl('https://umami.is')).toBe(true);
-    expect(isValidUrl('http://localhost:3000/path?q=1')).toBe(true);
+    expect(isValidLinkUrl('https://umami.is')).toBe(true);
+    expect(isValidLinkUrl('http://localhost:3000/path?q=1')).toBe(true);
+    expect(isValidLinkUrl('http://192.168.1.1')).toBe(true);
+    expect(isValidLinkUrl('http://[2001:db8::1]')).toBe(true);
+    expect(isValidLinkUrl('mailto:hi@example.com')).toBe(true);
+    expect(isValidLinkUrl('myapp://open')).toBe(true);
   });
 
   test('returns false for invalid urls', () => {
-    expect(isValidUrl('not a url')).toBe(false);
-    expect(isValidUrl('/relative/path')).toBe(false);
-    expect(isValidUrl('')).toBe(false);
+    expect(isValidLinkUrl('not a url')).toBe(false);
+    expect(isValidLinkUrl('/relative/path')).toBe(false);
+    expect(isValidLinkUrl('')).toBe(false);
   });
 });

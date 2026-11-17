@@ -39,10 +39,14 @@ export function safeDecodeURIComponent(s: string | undefined | null): string | u
   }
 }
 
-export function isValidUrl(url: string) {
+export function isValidLinkUrl(url: string) {
   try {
-    new URL(url);
-    return true;
+    const parsed = new URL(url);
+    return (
+      !['javascript:', 'data:', 'vbscript:', 'file:', 'blob:'].includes(parsed.protocol) &&
+      !parsed.username &&
+      !parsed.password
+    );
   } catch {
     return false;
   }

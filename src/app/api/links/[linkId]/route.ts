@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { isUniqueConstraintError } from '@/db/errors';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, ok, serverError, unauthorized } from '@/lib/response';
-import { isValidUrl } from '@/lib/url';
+import { isValidLinkUrl } from '@/lib/url';
 import { canDeleteLink, canUpdateLink, canViewLink } from '@/permissions';
 import { deleteLink, getLink, updateLink } from '@/queries/drizzle';
 
@@ -27,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ link
 export async function POST(request: Request, { params }: { params: Promise<{ linkId: string }> }) {
   const schema = z.object({
     name: z.string().max(100).optional(),
-    url: z.string().trim().max(500).refine(isValidUrl, { message: 'Invalid URL.' }).optional(),
+    url: z.string().trim().max(500).refine(isValidLinkUrl, { message: 'Invalid URL.' }).optional(),
     slug: z.string().min(8).max(100).optional(),
   });
 

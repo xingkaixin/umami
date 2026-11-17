@@ -69,3 +69,21 @@ test('POST requires link slugs to be at least 8 characters so create matches edi
   });
   expect(response.status).toBe(200);
 });
+
+test('POST rejects script, local-content and credential-bearing destinations', async () => {
+  parseRequestMock.mockResolvedValue({ error: () => new Response(null, { status: 400 }) });
+  await POST(new Request('http://localhost/api/links', { method: 'POST' }));
+  const schema = parseRequestMock.mock.calls[0][1];
+
+  for (const url of [
+    'javascript:alert(1)',
+    'java\tscript:alert(1)',
+    'data:text/html,test',
+    'vbscript:msgbox(1)',
+    'file:///tmp/example',
+    'blob:https://example.com/recording',
+    'https://trusted.example@other.example/path',
+  ]) {
+    expect(schema.safeParse({ name: 'Docs', url, slug: 'abcdefgh' }).success, url).toBe(false);
+  }
+});
