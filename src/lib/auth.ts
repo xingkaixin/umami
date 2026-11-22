@@ -1,4 +1,5 @@
 import debug from 'debug';
+import { hashApiToken, isApiToken } from '@/lib/api-token';
 import {
   ROLE_PERMISSIONS,
   ROLES,
@@ -9,11 +10,13 @@ import {
 import { hash, secret } from '@/lib/crypto';
 import { parseSecureToken, parseToken } from '@/lib/jwt';
 import { ensureArray } from '@/lib/utils';
+import { getApiTokenByHash, touchApiTokenLastUsed } from '@/queries/drizzle/apiToken';
 import { getShare } from '@/queries/drizzle/share';
 import { getTwoFactorAuth } from '@/queries/drizzle/twoFactor';
 import { getUser } from '@/queries/drizzle/user';
 
 const log = debug('umami:auth');
+const API_TOKEN_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
 export function getBearerToken(request: Request) {
   const auth = request.headers.get('authorization');
@@ -21,8 +24,50 @@ export function getBearerToken(request: Request) {
   return auth?.split(' ')[1];
 }
 
+async function checkApiToken(token: string) {
+  const record = await getApiTokenByHash(hashApiToken(token));
+  if (!record) {
+    return null;
+  }
+
+  const now = new Date();
+  if (record.expiresAt && record.expiresAt <= now) {
+    return null;
+  }
+
+  const user = await getUser(record.userId);
+  if (!user) {
+    return null;
+  }
+
+  // Throttle lastUsedAt writes to avoid extra D1 writes on every analytics query.
+  if (
+    !record.lastUsedAt ||
+    now.getTime() - record.lastUsedAt.getTime() >= API_TOKEN_TOUCH_INTERVAL_MS
+  ) {
+    try {
+      await touchApiTokenLastUsed(record.id, now);
+    } catch (e) {
+      log(e);
+    }
+  }
+
+  return {
+    token,
+    shareToken: null,
+    user: { ...user, isAdmin: user.role === ROLES.admin },
+    twoFactorSetupPending: false,
+    apiToken: { id: record.id, name: record.name },
+  };
+}
+
 export async function checkAuth(request: Request) {
   const token = getBearerToken(request);
+
+  if (isApiToken(token)) {
+    return checkApiToken(token);
+  }
+
   const payload = parseSecureToken(token, secret());
   const shareToken = await parseShareToken(request);
 

@@ -30,6 +30,10 @@ export interface Auth {
     linkIds?: string[];
     parameters?: ShareParameters;
   };
+  apiToken?: {
+    id: string;
+    name: string;
+  };
 }
 
 export type ShareTheme = 'light' | 'dark';

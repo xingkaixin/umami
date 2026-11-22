@@ -3,6 +3,7 @@ import { getDatabase } from '@/db/client';
 import { deleteOwnedEntities, deleteWebsiteData } from '@/db/delete';
 import { contains, paginate } from '@/db/pagination';
 import {
+  apiToken,
   type NewUser,
   report,
   segment,
@@ -118,6 +119,7 @@ export function deleteUser(id: string) {
     db.delete(twoFactorBackupCode).where(eq(twoFactorBackupCode.userId, id)),
     db.delete(twoFactorOtpUsed).where(eq(twoFactorOtpUsed.userId, id)),
     db.delete(twoFactorRateLimit).where(eq(twoFactorRateLimit.userId, id)),
+    db.delete(apiToken).where(eq(apiToken.userId, id)),
     db.delete(user).where(eq(user.id, id)).returning(),
   ]);
 }

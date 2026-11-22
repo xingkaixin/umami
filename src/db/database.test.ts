@@ -290,3 +290,106 @@ it('limits a login to 2FA setup routes until required 2FA is enabled', async () 
   expect((await get(getTeams, '/api/me/teams')).status).toBe(200);
   vi.unstubAllEnvs();
 });
+
+test('manages read-only personal API tokens end to end', async () => {
+  const { POST: login } = await import('@/app/api/auth/login/route');
+  const { GET: listTokens, POST: createToken } = await import('@/app/api/me/tokens/route');
+  const { DELETE: deleteToken } = await import('@/app/api/me/tokens/[tokenId]/route');
+  const { GET: listWebsites, POST: createWebsiteRoute } = await import('@/app/api/websites/route');
+  const { POST: verifyAuth } = await import('@/app/api/auth/verify/route');
+  const { hashPassword } = await import('@/lib/password');
+
+  const userId = crypto.randomUUID();
+  await createUser({
+    id: userId,
+    username: 'cliuser',
+    password: hashPassword('pass1234'),
+    role: 'user',
+  });
+  await createWebsite({
+    id: crypto.randomUUID(),
+    userId,
+    name: 'Blog',
+    domain: 'blog.example.com',
+  });
+
+  const loginRes = await login(
+    new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'cliuser', password: 'pass1234' }),
+    }),
+  );
+  const { token: sessionToken } = await loginRes.json();
+
+  const createRes = await createToken(
+    new Request('http://localhost/api/me/tokens', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${sessionToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'agent-cli', expiresInDays: 30 }),
+    }),
+  );
+  expect(createRes.status).toBe(200);
+  const created = await createRes.json();
+  expect(created.token).toMatch(/^umk_[0-9a-f]{64}$/);
+  expect(created.tokenPrefix).toBe(created.token.slice(0, 12));
+
+  const listRes = await listTokens(
+    new Request('http://localhost/api/me/tokens', {
+      headers: { authorization: `Bearer ${sessionToken}` },
+    }),
+  );
+  const listed = await listRes.json();
+  expect(listed.data).toHaveLength(1);
+  expect(listed.data[0]).not.toHaveProperty('token');
+  expect(listed.data[0]).not.toHaveProperty('tokenHash');
+
+  const websitesRes = await listWebsites(
+    new Request('http://localhost/api/websites', {
+      headers: { authorization: `Bearer ${created.token}` },
+    }),
+  );
+  expect(websitesRes.status).toBe(200);
+  const websitesBody = await websitesRes.json();
+  expect(websitesBody.data).toHaveLength(1);
+  expect(websitesBody.data[0].domain).toBe('blog.example.com');
+
+  const verifyRes = await verifyAuth(
+    new Request('http://localhost/api/auth/verify', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${created.token}` },
+    }),
+  );
+  expect(verifyRes.status).toBe(200);
+
+  const writeRes = await createWebsiteRoute(
+    new Request('http://localhost/api/websites', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${created.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Blocked', domain: 'blocked.example.com' }),
+    }),
+  );
+  expect(writeRes.status).toBe(403);
+
+  const manageSelfRes = await listTokens(
+    new Request('http://localhost/api/me/tokens', {
+      headers: { authorization: `Bearer ${created.token}` },
+    }),
+  );
+  expect(manageSelfRes.status).toBe(403);
+
+  const revokeRes = await deleteToken(
+    new Request(`http://localhost/api/me/tokens/${created.id}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${sessionToken}` },
+    }),
+    { params: Promise.resolve({ tokenId: created.id }) },
+  );
+  expect(revokeRes.status).toBe(200);
+
+  const afterRevokeRes = await listWebsites(
+    new Request('http://localhost/api/websites', {
+      headers: { authorization: `Bearer ${created.token}` },
+    }),
+  );
+  expect(afterRevokeRes.status).toBe(401);
+});

@@ -9,6 +9,7 @@ import { Panel } from '@/components/common/Panel';
 import { useMessages, useTwoFactorStatusQuery } from '@/components/hooks';
 import { TwoFactorDisableModal } from '@/components/modals/TwoFactorDisableModal';
 import { TwoFactorSetupModal } from '@/components/modals/TwoFactorSetupModal';
+import { ApiTokensSection } from './ApiTokensSection';
 
 export function UserSecurityPage() {
   const { t, labels, messages } = useMessages();
@@ -75,7 +76,7 @@ export function UserSecurityPage() {
                   />
                   <Text>{t(labels.twoFactorEnable)}</Text>
                 </Row>
-                  <Tooltip>{t(messages.twoFactorRequiredMessage)}</Tooltip>
+                <Tooltip>{t(messages.twoFactorRequiredMessage)}</Tooltip>
               </TooltipTrigger>
             ) : null}
 
@@ -108,6 +109,7 @@ export function UserSecurityPage() {
             )}
           </Column>
         </Panel>
+        <ApiTokensSection />
       </Column>
 
       {showSetup && <TwoFactorSetupModal required={false} onClose={handleSetupClose} />}

@@ -427,7 +427,20 @@
     "two-factor-reset": "重置2FA",
     "two-factor-global-active-tooltip": "全局 2FA 已启用",
     "two-factor-verify": "验证",
-    "two-factor-login": "双因素身份验证"
+    "two-factor-login": "双因素身份验证",
+    "api-tokens": "API 令牌",
+    "create-token": "创建令牌",
+    "revoke-token": "吊销",
+    "read-only": "只读",
+    "token-prefix": "令牌",
+    "last-used": "最近使用",
+    "expires": "过期时间",
+    "expiration": "有效期",
+    "never": "永不过期",
+    "expired": "已过期",
+    "days-30": "30 天",
+    "days-90": "90 天",
+    "days-365": "365 天"
   },
   "message": {
     "action-confirmation": "请在下方输入框中输入 {confirmation} 以确认操作。",
@@ -512,6 +525,9 @@
     "two-factor-error-no-pending-setup": "未找到待处理的双因素身份验证设置。",
     "two-factor-locked-message": "失败的尝试次数过多。请于 {time} 后重试。",
     "two-factor-active-description": "您的账户受到双因素身份验证的保护。每次登录都需要来自身份验证器应用程序的代码。",
-    "two-factor-error-not-configured": "由于服务器缺少有效的 TWO_FACTOR_ENCRYPTION_KEY，双因素身份验证不可用。请联系管理员获取帮助。"
+    "two-factor-error-not-configured": "由于服务器缺少有效的 TWO_FACTOR_ENCRYPTION_KEY，双因素身份验证不可用。请联系管理员获取帮助。",
+    "api-tokens-description": "创建个人只读 API 令牌，用于 CLI 工具、AI Agent 或数据同步脚本查询统计数据。",
+    "api-tokens-empty": "尚未创建任何 API 令牌。",
+    "api-token-created-once": "请立即复制此令牌。关闭窗口后将无法再次查看完整内容。"
   }
 }

@@ -165,3 +165,25 @@ export const appSetting = sqliteTable('app_setting', {
 
 export type AppSetting = typeof appSetting.$inferSelect;
 export type NewAppSetting = typeof appSetting.$inferInsert;
+
+export const apiToken = sqliteTable(
+  'api_token',
+  {
+    id: text('token_id').notNull().primaryKey(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    tokenPrefix: text('token_prefix').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: dateTime('expires_at'),
+    lastUsedAt: dateTime('last_used_at'),
+    createdAt: dateTime('created_at').notNull().default(now),
+  },
+  table => [
+    index('api_token_user_id_idx').on(table.userId),
+    check('api_token_name_length', sql`length(${table.name}) <= 100`),
+    check('api_token_prefix_length', sql`length(${table.tokenPrefix}) <= 32`),
+  ],
+);
+
+export type ApiToken = typeof apiToken.$inferSelect;
+export type NewApiToken = typeof apiToken.$inferInsert;

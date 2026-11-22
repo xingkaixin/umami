@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { hash } from '@/lib/crypto';
+import { hashApiToken, isReadOnlyApiRequest } from '@/lib/api-token';
 import { SHARE_TOKEN_HEADER, SHARE_TOKEN_TYPE } from '@/lib/constants';
+import { hash } from '@/lib/crypto';
 import { parseSecureToken, parseToken } from '@/lib/jwt';
+import { getApiTokenByHash, touchApiTokenLastUsed } from '@/queries/drizzle/apiToken';
 import { getShare } from '@/queries/drizzle/share';
 import { getUser } from '@/queries/drizzle/user';
 import { checkAuth, parseShareToken } from './auth';
@@ -9,6 +11,11 @@ import { checkAuth, parseShareToken } from './auth';
 vi.mock('@/lib/jwt', () => ({
   parseSecureToken: vi.fn(),
   parseToken: vi.fn(() => null),
+}));
+
+vi.mock('@/queries/drizzle/apiToken', () => ({
+  getApiTokenByHash: vi.fn(),
+  touchApiTokenLastUsed: vi.fn(),
 }));
 
 vi.mock('@/queries/drizzle/share', () => ({
@@ -160,5 +167,82 @@ describe('parseShareToken', () => {
       websiteId: 'website-1',
       parameters: { overview: true },
     });
+  });
+});
+
+describe('API token auth and read-only policy', () => {
+  const rawApiToken = `umk_${'a'.repeat(64)}`;
+
+  beforeEach(() => {
+    vi.mocked(getApiTokenByHash).mockReset();
+    vi.mocked(touchApiTokenLastUsed).mockReset();
+  });
+
+  test('authorizes a valid API token and updates lastUsedAt', async () => {
+    vi.mocked(getApiTokenByHash).mockResolvedValue({
+      id: 'tok-1',
+      userId: 'user-1',
+      name: 'agent-cli',
+      tokenPrefix: rawApiToken.slice(0, 12),
+      tokenHash: hashApiToken(rawApiToken),
+      expiresAt: null,
+      lastUsedAt: null,
+      createdAt: new Date(),
+    });
+    mockUser();
+
+    const result = await checkAuth(
+      new Request('http://localhost/api/websites', {
+        headers: { authorization: `Bearer ${rawApiToken}` },
+      }),
+    );
+
+    expect(result).toMatchObject({
+      user: { id: 'user-1' },
+      apiToken: { id: 'tok-1', name: 'agent-cli' },
+      twoFactorSetupPending: false,
+    });
+    expect(touchApiTokenLastUsed).toHaveBeenCalledWith('tok-1', expect.any(Date));
+  });
+
+  test('rejects an expired API token', async () => {
+    vi.mocked(getApiTokenByHash).mockResolvedValue({
+      id: 'tok-1',
+      userId: 'user-1',
+      name: 'expired',
+      tokenPrefix: rawApiToken.slice(0, 12),
+      tokenHash: hashApiToken(rawApiToken),
+      expiresAt: new Date(Date.now() - 60_000),
+      lastUsedAt: null,
+      createdAt: new Date(),
+    });
+
+    const result = await checkAuth(
+      new Request('http://localhost/api/websites', {
+        headers: { authorization: `Bearer ${rawApiToken}` },
+      }),
+    );
+
+    expect(result).toBeNull();
+  });
+
+  test('enforces read-only request boundaries for API tokens', () => {
+    expect(isReadOnlyApiRequest(new Request('http://localhost/api/websites'))).toBe(true);
+    expect(
+      isReadOnlyApiRequest(new Request('http://localhost/api/reports/funnel', { method: 'POST' })),
+    ).toBe(true);
+    expect(
+      isReadOnlyApiRequest(new Request('http://localhost/api/auth/verify', { method: 'POST' })),
+    ).toBe(true);
+    expect(
+      isReadOnlyApiRequest(new Request('http://localhost/api/websites', { method: 'POST' })),
+    ).toBe(false);
+    expect(
+      isReadOnlyApiRequest(new Request('http://localhost/api/websites/1', { method: 'DELETE' })),
+    ).toBe(false);
+    expect(isReadOnlyApiRequest(new Request('http://localhost/api/me/tokens'))).toBe(false);
+    expect(
+      isReadOnlyApiRequest(new Request('http://localhost/api/me/tokens/1', { method: 'DELETE' })),
+    ).toBe(false);
   });
 });

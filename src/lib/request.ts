@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isReadOnlyApiRequest } from '@/lib/api-token';
 import { checkAuth } from '@/lib/auth';
 import { DEFAULT_PAGE_SIZE, FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
 import {
@@ -58,6 +59,12 @@ export async function parseRequest(
 
     if (!auth) {
       error = () => unauthorized();
+    } else if (auth.apiToken && !isReadOnlyApiRequest(request)) {
+      error = () =>
+        forbidden({
+          code: 'read-only-token',
+          message: 'API tokens are read-only',
+        });
     } else if (auth.twoFactorSetupPending && !options?.allowTwoFactorSetup) {
       error = () =>
         forbidden({
