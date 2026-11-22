@@ -1,0 +1,24 @@
+[tasks.dev]
+description = "Run the Go Umami CLI directly for local debugging"
+dir = "cli"
+run = "go run ./cmd/umami"
+
+[tasks.build]
+description = "Build the Go Umami CLI binary to cli/bin/umami"
+dir = "cli"
+run = """
+mkdir -p bin
+ver="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+go build -ldflags="-s -w -X main.version=${ver}" -o bin/umami ./cmd/umami
+"""
+
+[tasks.install]
+description = "Build and install the Go Umami CLI into local PATH (~/.local/bin/umami)"
+dir = "cli"
+run = """
+install_dir="${UMAMI_INSTALL_DIR:-$HOME/.local/bin}"
+mkdir -p "$install_dir"
+ver="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+go build -ldflags="-s -w -X main.version=${ver}" -o "$install_dir/umami" ./cmd/umami
+echo "Installed umami (${ver}) to $install_dir/umami"
+"""
