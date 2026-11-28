@@ -1,6 +1,13 @@
 import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
 
+const d1Tests = ['src/db/**/*.test.ts', 'src/queries/sql/sessions/saveSessionData.test.ts'];
+const domTests = [
+  'src/**/*.test.tsx',
+  'src/components/**/*.test.ts',
+  'src/store/dashboard.test.ts',
+];
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -20,9 +27,17 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
+          environment: 'node',
+          include: ['src/**/*.test.ts'],
+          exclude: [...d1Tests, ...domTests],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
           environment: 'jsdom',
-          include: ['src/**/*.test.{ts,tsx}'],
-          exclude: ['src/db/**/*.test.ts', 'src/queries/sql/sessions/saveSessionData.test.ts'],
+          include: domTests,
           setupFiles: ['./src/test/setup.ts'],
         },
       },
@@ -31,7 +46,7 @@ export default defineConfig({
         test: {
           name: 'd1',
           environment: 'node',
-          include: ['src/db/**/*.test.ts', 'src/queries/sql/sessions/saveSessionData.test.ts'],
+          include: d1Tests,
         },
       },
     ],
