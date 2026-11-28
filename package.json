@@ -31,6 +31,8 @@
     "download-country-names": "node scripts/download-country-names.js",
     "download-language-names": "node scripts/download-language-names.js",
     "test": "vitest run",
+    "test:changed": "vitest run --changed",
+    "test:since-last-run": "vitest run --since-last-run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

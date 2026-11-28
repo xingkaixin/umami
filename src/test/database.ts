@@ -1,8 +1,14 @@
-import { readFile } from 'node:fs/promises';
 import { getTableName } from 'drizzle-orm';
 import { Miniflare } from 'miniflare';
 import * as schema from '@/db/schema';
+import journal from '../../db/d1/meta/_journal.json';
 import { env } from './cloudflare';
+
+const migrations = import.meta.glob<string>('../../db/d1/*.sql', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
 
 export async function createTestDatabase() {
   const worker = new Miniflare({
@@ -27,14 +33,11 @@ export async function createTestDatabase() {
   });
   try {
     env.DB = (await worker.getD1Database('DB')) as typeof env.DB;
-    const journal = JSON.parse(
-      await readFile(new URL('../../db/d1/meta/_journal.json', import.meta.url), 'utf8'),
-    );
     for (const entry of journal.entries) {
-      const migration = await readFile(
-        new URL(`../../db/d1/${entry.tag}.sql`, import.meta.url),
-        'utf8',
-      );
+      const migration = migrations[`../../db/d1/${entry.tag}.sql`];
+      if (!migration) {
+        throw new Error(`Missing D1 migration file: ${entry.tag}.sql`);
+      }
       const statements = migration
         .split('--> statement-breakpoint')
         .map(statement => statement.trim())

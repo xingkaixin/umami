@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
@@ -11,6 +11,10 @@ export default defineConfig({
   test: {
     env: { APP_SECRET: 'umami-test-only-secret' },
     maxWorkers: 4,
+    forceRerunTriggers: [...configDefaults.forceRerunTriggers, '**/pnpm-lock.yaml'],
+    experimental: {
+      recordDependencies: true,
+    },
     projects: [
       {
         extends: true,
